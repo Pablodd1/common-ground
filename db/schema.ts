@@ -3,6 +3,7 @@ import {
   boolean,
   index,
   int,
+  json,
   mysqlEnum,
   mysqlTable,
   primaryKey,
@@ -107,6 +108,19 @@ export const messages = mysqlTable(
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
   (table) => [index("messages_conversation_idx").on(table.conversationId, table.createdAt)],
+);
+
+export const assistantMessages = mysqlTable(
+  "assistantMessages",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    role: mysqlEnum("role", ["user", "assistant"]).notNull(),
+    body: text("body").notNull(),
+    sources: json("sources"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("assistant_user_idx").on(table.userId, table.createdAt)],
 );
 
 export type User = typeof users.$inferSelect;

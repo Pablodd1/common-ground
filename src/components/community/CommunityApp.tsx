@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Cake, Compass, Home as HomeIcon, LogOut, MessageCircle, Settings2, ShieldCheck, Users } from "lucide-react";
+import { BookOpen, Cake, Compass, Home as HomeIcon, LogOut, MessageCircle, Settings2, ShieldCheck, Users } from "lucide-react";
 import { trpc, type Person } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
 import { Feed } from "./Feed";
@@ -8,13 +8,15 @@ import { Messages } from "./Messages";
 import { Celebrations, CelebrationsRail, useCelebrations } from "./Celebrations";
 import { ProfileEditor } from "./ProfileEditor";
 import { PersonAvatar } from "./PersonAvatar";
+import { CompanyAssistant } from "./CompanyAssistant";
 
-type Tab = "feed" | "people" | "messages" | "celebrations";
+type Tab = "feed" | "people" | "messages" | "assistant" | "celebrations";
 
 const navItems = [
   { id: "feed" as const, label: "Community", icon: HomeIcon },
   { id: "people" as const, label: "People", icon: Users },
   { id: "messages" as const, label: "Messages", icon: MessageCircle },
+  { id: "assistant" as const, label: "Company", icon: BookOpen },
   { id: "celebrations" as const, label: "Celebrations", icon: Cake },
 ];
 
@@ -54,6 +56,7 @@ export function CommunityApp({ onLogout }: { onLogout: () => void }) {
       {tab === "feed" && <div className="feed-layout"><Feed currentUser={user} /><aside className="right-rail"><CelebrationsRail events={events} currentUser={user} /><CommunityPrinciples /></aside></div>}
       {tab === "people" && <People currentUser={user} onMessage={messagePerson} />}
       {tab === "messages" && <Messages currentUser={user} activeConversation={activeConversation} setActiveConversation={setActiveConversation} onFindPeople={() => setTab("people")} />}
+      {tab === "assistant" && <CompanyAssistant />}
       {tab === "celebrations" && <Celebrations events={events} currentUser={user} />}
     </main>
 
