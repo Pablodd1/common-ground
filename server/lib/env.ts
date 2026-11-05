@@ -14,7 +14,9 @@ export const env = {
   // Postgres (Supabase). Runtime should use the transaction pooler (6543),
   // which requires prepared statements to be disabled — see queries/connection.
   databaseUrl: required("DATABASE_URL"),
-  supabaseUrl: required("VITE_SUPABASE_URL").replace(/\/+$/, ""),
+  // Server-side project URL for Auth and Storage REST. Deliberately not
+  // VITE_-prefixed: nothing in this variable belongs in the browser bundle.
+  supabaseUrl: (process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL ?? "").replace(/\/+$/, ""),
   supabaseServiceKey: required("SUPABASE_SECRET_KEY"),
   storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? "media",
   allowedEmailDomains: (process.env.ALLOWED_EMAIL_DOMAINS ?? "")

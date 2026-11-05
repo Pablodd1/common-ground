@@ -72,7 +72,7 @@ Nunca pegues los valores reales en GitHub, capturas o conversaciones.
 |---|---|---|
 | `APP_SECRET` | Firma JWT de las sesiones | No |
 | `DATABASE_URL` | Postgres (Supabase, pooler 6543 en runtime) | No |
-| `VITE_SUPABASE_URL` | URL del proyecto Supabase (la lee el servidor para Auth y Storage) | No la usa el bundle |
+| `SUPABASE_URL` | URL del proyecto Supabase; la lee el servidor para Auth y Storage | No |
 | `SUPABASE_SECRET_KEY` | Llave secreta: Auth admin y Storage | No |
 | `SUPABASE_STORAGE_BUCKET` | Bucket privado de medios (por defecto `media`) | No |
 | `ALLOWED_EMAIL_DOMAINS` | Dominios autorizados para crear cuenta e ingresar, separados por comas | No |
