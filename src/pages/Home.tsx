@@ -1,20 +1,9 @@
-import { useState } from 'react'
-import '../App.css'
+import { CommunityApp } from "@/components/community/CommunityApp";
+import { useAuth } from "@/hooks/useAuth";
+import { LOGIN_PATH } from "@/const";
 
 export default function Home() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-    </>
-  )
+  const { isLoading, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: true, redirectPath: LOGIN_PATH });
+  if (isLoading || !isAuthenticated) return <div className="app-loading"><div className="loading-mark" /><p>Opening Common Ground…</p></div>;
+  return <CommunityApp onLogout={logout} />;
 }

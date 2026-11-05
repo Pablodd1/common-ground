@@ -1,11 +1,16 @@
 import {
-  mysqlTable,
+  bigint,
+  boolean,
+  index,
+  int,
   mysqlEnum,
+  mysqlTable,
+  primaryKey,
   serial,
-  varchar,
   text,
   timestamp,
-  // bigint,
+  uniqueIndex,
+  varchar,
 } from "drizzle-orm/mysql-core";
 
 export const users = mysqlTable("users", {
@@ -14,7 +19,18 @@ export const users = mysqlTable("users", {
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
+  avatarKey: text("avatarKey"),
   role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  jobTitle: varchar("jobTitle", { length: 120 }),
+  department: varchar("department", { length: 120 }),
+  location: varchar("location", { length: 120 }),
+  bio: text("bio"),
+  interests: text("interests"),
+  birthday: varchar("birthday", { length: 10 }),
+  startDate: varchar("startDate", { length: 10 }),
+  shareBirthday: boolean("shareBirthday").default(true).notNull(),
+  shareLocation: boolean("shareLocation").default(true).notNull(),
+  isDemo: boolean("isDemo").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -23,18 +39,80 @@ export const users = mysqlTable("users", {
   lastSignInAt: timestamp("lastSignInAt").defaultNow().notNull(),
 });
 
+export const files = mysqlTable("files", {
+  id: serial("id").primaryKey(),
+  key: varchar("key", { length: 512 }).notNull().unique(),
+  ownerId: bigint("ownerId", { mode: "number", unsigned: true }).notNull(),
+  name: varchar("name", { length: 255 }).notNull(),
+  size: int("size").notNull(),
+  contentType: varchar("contentType", { length: 120 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const posts = mysqlTable(
+  "posts",
+  {
+    id: serial("id").primaryKey(),
+    authorId: bigint("authorId", { mode: "number", unsigned: true }).notNull(),
+    body: text("body").notNull(),
+    topic: mysqlEnum("topic", ["Motivation", "Outside work", "Wins", "Questions", "Celebration"])
+      .default("Motivation")
+      .notNull(),
+    mediaKey: varchar("mediaKey", { length: 512 }),
+    mediaType: varchar("mediaType", { length: 120 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("posts_created_idx").on(table.createdAt)],
+);
+
+export const likes = mysqlTable(
+  "likes",
+  {
+    postId: bigint("postId", { mode: "number", unsigned: true }).notNull(),
+    userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [primaryKey({ columns: [table.postId, table.userId] })],
+);
+
+export const comments = mysqlTable("comments", {
+  id: serial("id").primaryKey(),
+  postId: bigint("postId", { mode: "number", unsigned: true }).notNull(),
+  authorId: bigint("authorId", { mode: "number", unsigned: true }).notNull(),
+  body: varchar("body", { length: 1000 }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export const conversations = mysqlTable(
+  "conversations",
+  {
+    id: serial("id").primaryKey(),
+    userOneId: bigint("userOneId", { mode: "number", unsigned: true }).notNull(),
+    userTwoId: bigint("userTwoId", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    lastMessageAt: timestamp("lastMessageAt").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("conversation_pair_idx").on(table.userOneId, table.userTwoId)],
+);
+
+export const messages = mysqlTable(
+  "messages",
+  {
+    id: serial("id").primaryKey(),
+    conversationId: bigint("conversationId", { mode: "number", unsigned: true }).notNull(),
+    senderId: bigint("senderId", { mode: "number", unsigned: true }).notNull(),
+    body: text("body").notNull(),
+    mediaKey: varchar("mediaKey", { length: 512 }),
+    mediaType: varchar("mediaType", { length: 120 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("messages_conversation_idx").on(table.conversationId, table.createdAt)],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
-
-// TODO: Add your tables here. See docs/Database.md for schema examples and patterns.
-//
-// Example:
-// export const posts = mysqlTable("posts", {
-//   id: serial("id").primaryKey(),
-//   title: varchar("title", { length: 255 }).notNull(),
-//   content: text("content"),
-//   createdAt: timestamp("created_at").notNull().defaultNow(),
-// });
-//
-// Note: FK columns referencing a serial() PK must use:
-//   bigint("columnName", { mode: "number", unsigned: true }).notNull()
+export type Post = typeof posts.$inferSelect;
+export type Comment = typeof comments.$inferSelect;
+export type Conversation = typeof conversations.$inferSelect;
+export type Message = typeof messages.$inferSelect;
+export type StoredFile = typeof files.$inferSelect;
