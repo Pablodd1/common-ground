@@ -8,6 +8,18 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -16,4 +28,8 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      # Aplica las migraciones a una base Postgres vacía y ejecuta las pruebas de integración.
+      - run: npm test
+        env:
+          TEST_DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/unitec_test
       - run: npm run build

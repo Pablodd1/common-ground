@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertCircle, ArrowUpRight, BookOpen, Building2, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Library, LoaderCircle, Mail, MessageSquareText, Pencil, Phone, Plus, Send, ShieldCheck, Sparkles, Trash2, UserRound, UsersRound, X } from "lucide-react";
+import { AlertCircle, ArrowUpRight, BookOpen, Building2, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Library, LoaderCircle, Mail, MessageSquareText, Pencil, Phone, Plus, Send, ShieldCheck, Sparkles, ThumbsDown, ThumbsUp, Trash2, TrendingUp, UserRound, UsersRound, X } from "lucide-react";
 import { trpc, type RouterOutputs } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
 
@@ -20,6 +20,8 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
   const [libraryView, setLibraryView] = useState<LibraryView>("manual");
   const [selectedDocument, setSelectedDocument] = useState<ManualDocument | null>(null);
   const [editingDocument, setEditingDocument] = useState<ManualDocument | null | "new">(null);
+  const [draftTitle, setDraftTitle] = useState("");
+  const [insightsOpen, setInsightsOpen] = useState(false);
   const [manualOpen, setManualOpen] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const utils = trpc.useUtils();
@@ -28,6 +30,7 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
   const ask = trpc.assistant.ask.useMutation({
     onSuccess: async () => { setQuestion(""); await utils.assistant.history.invalidate(); },
   });
+  const rate = trpc.assistant.rate.useMutation({ onSuccess: async () => { await utils.assistant.history.invalidate(); } });
   const clear = trpc.assistant.clear.useMutation({ onSuccess: async () => { await utils.assistant.history.invalidate(); } });
   const remove = trpc.assistant.deleteResource.useMutation({
     onSuccess: async () => { setSelectedDocument(null); await utils.assistant.manual.invalidate(); },
@@ -63,13 +66,14 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
     if (document) setSelectedDocument(document);
   }
 
-  function addResource() { setEditingDocument("new"); }
+  function addResource(title = "") { setDraftTitle(title); setEditingDocument("new"); }
 
   return <div className="assistant-view">
     <section className="assistant-workspace">
       <header className="assistant-header">
         <div><span className="eyebrow"><Sparkles /> EMPRESA Y RR. HH., EN UN SOLO LUGAR</span><h1>Pregunta al manual.</h1><p>Respuestas, estándares, formación y las personas indicadas.</p></div>
         <div className="assistant-header-actions">
+          {isAdmin && <button className="clear-chat" onClick={() => setInsightsOpen(true)}><TrendingUp /> Aprendizaje</button>}
           {Boolean(history.data?.length) && <button className="clear-chat" onClick={() => clear.mutate()} disabled={clear.isPending}><Trash2 /> Borrar</button>}
           <button className="manual-mobile-button" onClick={() => setManualOpen((open) => !open)}><Library /> Centro de empresa</button>
         </div>
@@ -93,6 +97,11 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
           <div className="message-label">{message.role === "assistant" ? <><Sparkles /> Asistente del manual</> : "Tú"}</div>
           <div className="message-bubble">{message.body}</div>
           {message.role === "assistant" && message.sources.length > 0 && <div className="message-sources"><span><Check /> Basado en {message.sources.length} {message.sources.length === 1 ? "fuente de la empresa" : "fuentes de la empresa"}</span>{message.sources.map((source) => source.url ? <a key={source.id} href={source.url} target="_blank" rel="noreferrer"><BookOpen />{source.title}<ExternalLink /></a> : <button key={source.id} onClick={() => openSource(source)}><ShieldCheck />{source.title}<ArrowUpRight /></button>)}</div>}
+          {message.role === "assistant" && <div className="answer-feedback" aria-label="¿Te sirvió esta respuesta?">
+            <span>¿Te sirvió?</span>
+            <button className={message.feedback === "helpful" ? "active" : ""} disabled={rate.isPending} aria-pressed={message.feedback === "helpful"} aria-label="Sí, me sirvió" onClick={() => rate.mutate({ id: message.id, feedback: message.feedback === "helpful" ? null : "helpful" })}><ThumbsUp /></button>
+            <button className={message.feedback === "unhelpful" ? "active" : ""} disabled={rate.isPending} aria-pressed={message.feedback === "unhelpful"} aria-label="No me sirvió" onClick={() => rate.mutate({ id: message.id, feedback: message.feedback === "unhelpful" ? null : "unhelpful" })}><ThumbsDown /></button>
+          </div>}
         </article>)}
 
         {ask.isPending && <div className="assistant-message assistant pending"><div className="message-label"><Sparkles /> Asistente del manual</div><div className="message-bubble thinking"><i /><i /><i /><span>Revisando las fuentes de la empresa…</span></div></div>}
@@ -108,7 +117,7 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
     </section>
 
     <aside className={`manual-library ${manualOpen ? "open" : ""}`}>
-      <div className="manual-library-heading"><span className="eyebrow"><Library /> CENTRO DE LA EMPRESA</span><h2>Todo en un solo lugar.</h2><p>Instrucciones, formación y responsables.</p>{isAdmin && <button className="add-resource-button" onClick={addResource}><Plus /> Agregar recurso</button>}</div>
+      <div className="manual-library-heading"><span className="eyebrow"><Library /> CENTRO DE LA EMPRESA</span><h2>Todo en un solo lugar.</h2><p>Instrucciones, formación y responsables.</p>{isAdmin && <button className="add-resource-button" onClick={() => addResource()}><Plus /> Agregar recurso</button>}</div>
       <div className="library-view-tabs three"><button className={libraryView === "manual" ? "active" : ""} onClick={() => setLibraryView("manual")}><BookOpen /> Manual <span>{manualDocuments.length}</span></button><button className={libraryView === "learning" ? "active" : ""} onClick={() => setLibraryView("learning")}><GraduationCap /> Formación <span>{learning.length}</span></button><button className={libraryView === "contacts" ? "active" : ""} onClick={() => setLibraryView("contacts")}><UsersRound /> Contactos <span>{contacts.length}</span></button></div>
 
       {libraryView === "manual" && <>
@@ -120,7 +129,7 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
       </>}
 
       {libraryView === "learning" && <div className="learning-directory">
-        {!learning.length && <div className="contact-empty"><GraduationCap /><h3>Aún no hay cursos ni documentos.</h3><p>{isAdmin ? "Agrega enlaces verificados a cursos, presentaciones, videos, manuales u otros documentos para el personal." : "Un administrador debe publicar los enlaces de formación y documentos del personal."}</p>{isAdmin && <button onClick={addResource}><Plus /> Agregar el primero</button>}</div>}
+        {!learning.length && <div className="contact-empty"><GraduationCap /><h3>Aún no hay cursos ni documentos.</h3><p>{isAdmin ? "Agrega enlaces verificados a cursos, presentaciones, videos, manuales u otros documentos para el personal." : "Un administrador debe publicar los enlaces de formación y documentos del personal."}</p>{isAdmin && <button onClick={() => addResource()}><Plus /> Agregar el primero</button>}</div>}
         {learning.map((resource) => <article className="learning-card" key={resource.id}>
           <div className="learning-icon">{resource.kind === "course" ? <GraduationCap /> : <FileText />}</div>
           <div className="learning-copy"><span>{resource.kind === "course" ? "Curso" : "Documento"} · {resource.category}{resource.isPublished === false ? " · Borrador" : ""}</span><h3>{resource.title}</h3><p>{resource.summary}</p>{resource.body && resource.body !== resource.summary && <p>{resource.body}</p>}<div className="learning-actions">{resource.url && <a href={resource.url} target="_blank" rel="noreferrer">{resource.kind === "course" ? "Abrir curso" : "Abrir documento"}<ExternalLink /></a>}{isAdmin && <><button onClick={() => setEditingDocument(resource)}><Pencil /> Editar</button><button disabled={remove.isPending} onClick={() => { if (window.confirm(`¿Eliminar “${resource.title}”? Esta acción no se puede deshacer.`)) remove.mutate({ id: resource.resourceId! }); }}><Trash2 /> Eliminar</button></>}</div></div>
@@ -128,7 +137,7 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
       </div>}
 
       {libraryView === "contacts" && <div className="contact-directory">
-        {!contacts.length && <div className="contact-empty"><UserRound /><h3>Aún no hay contactos internos.</h3><p>{isAdmin ? "Agrega la persona o el equipo, sus responsabilidades, la línea de reporte y los datos de contacto verificados." : "Un administrador debe publicar los contactos de RR. HH., reportes y escalamiento."}</p>{isAdmin && <button onClick={addResource}><Plus /> Agregar el primero</button>}</div>}
+        {!contacts.length && <div className="contact-empty"><UserRound /><h3>Aún no hay contactos internos.</h3><p>{isAdmin ? "Agrega la persona o el equipo, sus responsabilidades, la línea de reporte y los datos de contacto verificados." : "Un administrador debe publicar los contactos de RR. HH., reportes y escalamiento."}</p>{isAdmin && <button onClick={() => addResource()}><Plus /> Agregar el primero</button>}</div>}
         {contacts.map((contact) => <article className="contact-card" key={contact.id}>
           <div className="contact-card-top"><span className="contact-initial">{contact.title.charAt(0)}</span><div><span>{contact.category}{contact.isPublished === false ? " · Borrador" : ""}</span><h3>{contact.title}</h3><p>{contact.summary}</p></div>{isAdmin && <button className="edit-resource" onClick={() => setEditingDocument(contact)} aria-label={`Editar ${contact.title}`}><Pencil /></button>}</div>
           <p className="contact-responsibilities">{contact.body}</p>
@@ -151,13 +160,53 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
       </section>
     </div>}
 
-    {editingDocument && <ResourceEditor document={editingDocument === "new" ? null : editingDocument} defaultKind={libraryView === "contacts" ? "contact" : libraryView === "learning" ? "course" : "document"} onClose={() => setEditingDocument(null)} onSaved={async () => { setEditingDocument(null); await utils.assistant.manual.invalidate(); }} />}
+    {insightsOpen && <LearningInsights onClose={() => setInsightsOpen(false)} onCreate={(title) => { setInsightsOpen(false); addResource(title); }} />}
+    {editingDocument && <ResourceEditor document={editingDocument === "new" ? null : editingDocument} draftTitle={draftTitle} defaultKind={draftTitle ? "document" : libraryView === "contacts" ? "contact" : libraryView === "learning" ? "course" : "document"} onClose={() => setEditingDocument(null)} onSaved={async () => { setEditingDocument(null); await utils.assistant.manual.invalidate(); }} />}
   </div>;
 }
 
-function ResourceEditor({ document, defaultKind, onClose, onSaved }: { document: ManualDocument | null; defaultKind: ResourceKind; onClose: () => void; onSaved: () => Promise<void> }) {
+function LearningInsights({ onClose, onCreate }: { onClose: () => void; onCreate: (title: string) => void }) {
+  const [days, setDays] = useState(90);
+  const insights = trpc.assistant.insights.useQuery({ days });
+  const data = insights.data;
+  const answeredRate = data?.totals.questions ? Math.round(100 * (1 - data.totals.unanswered / data.totals.questions)) : null;
+
+  return <div className="manual-modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="resource-editor learning-insights" role="dialog" aria-label="Aprendizaje del asistente">
+      <button type="button" className="manual-modal-close" onClick={onClose} aria-label="Cerrar"><X /></button>
+      <span className="eyebrow">ADMINISTRACIÓN · APRENDIZAJE DEL ASISTENTE</span>
+      <h2>Lo que el personal necesita saber.</h2>
+      <p>Preguntas que el manual no pudo responder y respuestas que el personal marcó como poco útiles. Es <strong>anónimo</strong>: no se muestra quién preguntó. Los mensajes directos entre colegas nunca se usan. El asistente mejora cuando publicas el recurso que falta.</p>
+      <label className="insights-range">Periodo<select value={days} onChange={(event) => setDays(Number(event.target.value))}><option value={7}>Últimos 7 días</option><option value={30}>Últimos 30 días</option><option value={90}>Últimos 90 días</option><option value={365}>Último año</option></select></label>
+      {insights.isLoading && <div className="assistant-loading"><LoaderCircle className="spin" /> Cargando…</div>}
+      {insights.error && <div className="resource-save-error">{insights.error.message}</div>}
+      {data && <>
+        <div className="insights-stats">
+          <div><strong>{data.totals.questions}</strong><span>preguntas</span></div>
+          <div><strong>{answeredRate === null ? "—" : `${answeredRate}%`}</strong><span>con fuentes</span></div>
+          <div><strong>{data.totals.helpful}</strong><span>👍 útiles</span></div>
+          <div><strong>{data.totals.unhelpful}</strong><span>👎 poco útiles</span></div>
+        </div>
+        <h3>Preguntas sin respuesta en el manual</h3>
+        {!data.gaps.length && <p className="muted-copy">No hay preguntas sin respuesta en este periodo.</p>}
+        <ul className="insights-list">{data.gaps.map((gap) => <li key={gap.question}>
+          <div><p>{gap.question}</p><small>{gap.count === 1 ? "1 vez" : `${gap.count} veces`}</small></div>
+          <Button size="sm" variant="outline" onClick={() => onCreate(gap.question.slice(0, 180))}><Plus /> Crear recurso</Button>
+        </li>)}</ul>
+        <h3>Respuestas marcadas como poco útiles</h3>
+        {!data.unhelpful.length && <p className="muted-copy">Nadie ha marcado respuestas como poco útiles en este periodo.</p>}
+        <ul className="insights-list">{data.unhelpful.map((item) => <li key={item.id}>
+          <div><p><strong>Pregunta:</strong> {item.question || "—"}</p><p className="insights-answer">{item.answer}</p>{item.sources.length > 0 && <small>Fuentes usadas: {item.sources.join(", ")}</small>}</div>
+          {item.question && <Button size="sm" variant="outline" onClick={() => onCreate(item.question.slice(0, 180))}><Plus /> Mejorar</Button>}
+        </li>)}</ul>
+      </>}
+    </section>
+  </div>;
+}
+
+function ResourceEditor({ document, draftTitle = "", defaultKind, onClose, onSaved }: { document: ManualDocument | null; draftTitle?: string; defaultKind: ResourceKind; onClose: () => void; onSaved: () => Promise<void> }) {
   const [kind, setKind] = useState<ResourceKind>(document?.kind ?? defaultKind);
-  const [title, setTitle] = useState(document?.title ?? "");
+  const [title, setTitle] = useState(document?.title ?? draftTitle);
   const [category, setCategory] = useState(document?.category ?? (defaultKind === "contact" ? "RR. HH." : defaultKind === "course" || defaultKind === "file" ? "Formación" : "Estándares"));
   const [summary, setSummary] = useState(document?.summary ?? "");
   const [body, setBody] = useState(document?.body ?? "");

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { Heart, MessageCircle, Send, Sparkles } from "lucide-react";
+import { Heart, MessageCircle, Send, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser, type FeedPost } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
@@ -84,12 +84,21 @@ function PostCard({ post, currentUser }: { post: FeedPost; currentUser: Communit
     onSuccess: () => { setComment(""); void utils.community.feed.invalidate(); },
     onError: (error) => toast.error(error.message),
   });
+  const deletePost = trpc.community.deletePost.useMutation({
+    onSuccess: () => { toast.success("Publicación eliminada"); void utils.community.feed.invalidate(); },
+    onError: (error) => toast.error(error.message),
+  });
+  const deleteComment = trpc.community.deleteComment.useMutation({
+    onSuccess: () => void utils.community.feed.invalidate(),
+    onError: (error) => toast.error(error.message),
+  });
 
   return <article className="post-card">
     <header className="post-header">
       <PersonAvatar person={post.author} />
       <div><strong>{post.author.name}{post.author.isDemo && <span className="sample-tag">EJEMPLO</span>}</strong><p>{post.author.jobTitle || "Colega"} · {formatDistanceToNow(post.createdAt, { addSuffix: true, locale: es })}</p></div>
       <span className="topic-label">{topicLabels[post.topic]}</span>
+      {post.canDelete && <Button variant="ghost" size="icon" className="post-delete" disabled={deletePost.isPending} aria-label="Eliminar publicación" onClick={() => { if (window.confirm("¿Eliminar esta publicación y sus respuestas? Esta acción no se puede deshacer.")) deletePost.mutate({ postId: post.id }); }}><Trash2 /></Button>}
     </header>
     {post.body && <p className="post-body">{post.body}</p>}
     {post.mediaKey && <MediaView mediaKey={post.mediaKey} mediaType={post.mediaType} />}
@@ -98,7 +107,7 @@ function PostCard({ post, currentUser }: { post: FeedPost; currentUser: Communit
       <button onClick={() => setShowComments((value) => !value)} aria-expanded={showComments}><MessageCircle />{post.comments.length || "Responder"}</button>
     </footer>
     {showComments && <div className="comments">
-      {post.comments.map((item) => <div className="comment" key={item.id}><PersonAvatar person={item.author} size="sm" /><div><strong>{item.author.name}</strong><p>{item.body}</p></div></div>)}
+      {post.comments.map((item) => <div className="comment" key={item.id}><PersonAvatar person={item.author} size="sm" /><div><strong>{item.author.name}</strong><p>{item.body}</p></div>{item.canDelete && <Button variant="ghost" size="icon" className="comment-delete" disabled={deleteComment.isPending} aria-label="Eliminar respuesta" onClick={() => { if (window.confirm("¿Eliminar esta respuesta?")) deleteComment.mutate({ commentId: item.id }); }}><Trash2 /></Button>}</div>)}
       <form className="comment-form" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) addComment.mutate({ postId: post.id, body: comment }); }}>
         <PersonAvatar person={{ ...currentUser, id: currentUser.id, name: currentUser.name ?? "Tú" }} size="sm" />
         <Input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Escribe una respuesta…" maxLength={1000} />

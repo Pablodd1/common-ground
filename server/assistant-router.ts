@@ -1,21 +1,12 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { assistantMessages, companyResources } from "@db/schema";
 import { adminQuery, authedQuery, createRouter } from "./middleware";
 import { getDb } from "./queries/connection";
-import {
-  AiInvalidRequest,
-  AiMisconfigured,
-  AiTransient,
-  AiUnavailable,
-  ContentRejected,
-  classifyAiError,
-  listModels,
-} from "./lib/ai-client";
-import { companyManual, retrieveManualSources, toManualSource, type ManualDocument, type ManualSource } from "./lib/company-manual";
+import { deepseekModel, friendlyAiError } from "./lib/ai";
+import { companyManual, normalize, retrieveManualSources, toManualSource, type ManualDocument, type ManualSource } from "./lib/company-manual";
 
 type CompanyResource = typeof companyResources.$inferSelect;
 
@@ -56,31 +47,6 @@ async function loadInternalDocuments(includeDrafts = false) {
   return resources.filter((resource) => includeDrafts || resource.isPublished).map(resourceToDocument);
 }
 
-function friendlyAiError(error: unknown): TRPCError {
-  const classified = classifyAiError(error);
-  if (classified instanceof AiUnavailable) {
-    return new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "El asistente de la empresa no está disponible porque el cupo de IA del sitio está agotado. Un administrador debe agregar cupo en Kimi.",
-      cause: classified,
-    });
-  }
-  if (classified instanceof AiMisconfigured) {
-    return new TRPCError({ code: "PRECONDITION_FAILED", message: "La configuración del asistente debe restablecerse. Contacta al administrador del sitio.", cause: classified });
-  }
-  if (classified instanceof ContentRejected) {
-    return new TRPCError({ code: "BAD_REQUEST", message: "No pudimos procesar esa pregunta. Reformúlala con información relacionada con la empresa.", cause: classified });
-  }
-  if (classified instanceof AiTransient) {
-    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no está disponible temporalmente. No volvimos a enviar tu pregunta automáticamente; inténtalo de nuevo dentro de un momento.", cause: classified });
-  }
-  if (classified instanceof AiInvalidRequest) {
-    console.error("Error en la solicitud del asistente de empresa:", classified.message);
-    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no pudo procesar esta solicitud. Intenta con otra pregunta.", cause: classified });
-  }
-  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no está disponible temporalmente. Inténtalo de nuevo más tarde.", cause: classified });
-}
-
 export const assistantRouter = createRouter({
   manual: authedQuery.query(async ({ ctx }) => ({
     documents: [...companyManual, ...await loadInternalDocuments(ctx.user.role === "admin")],
@@ -91,7 +57,8 @@ export const assistantRouter = createRouter({
   history: authedQuery.query(async ({ ctx }) => {
     const rows = await getDb().select().from(assistantMessages)
       .where(eq(assistantMessages.userId, ctx.user.id))
-      .orderBy(desc(assistantMessages.createdAt))
+      // La pregunta y la respuesta se guardan en el mismo segundo: el id desempata.
+      .orderBy(desc(assistantMessages.createdAt), desc(assistantMessages.id))
       .limit(100);
     return rows.reverse().map((row) => ({
       ...row,
@@ -111,10 +78,12 @@ export const assistantRouter = createRouter({
         answer = "No encontré esa información en el manual de la empresa ni en los recursos internos publicados por un administrador. No voy a adivinar datos sobre el personal, políticas, precios, contactos o responsabilidades de reporte. Puedes preguntar por la empresa, los productos, las importaciones, los estándares publicados o los canales de contacto; también puedes consultar al equipo interno responsable.";
       } else {
         sources = documents.map(toManualSource);
-        const recent = await getDb().select().from(assistantMessages)
+        // Solo los 6 mensajes más recientes; antes se leía todo el historial para usar 6.
+        const recent = (await getDb().select().from(assistantMessages)
           .where(eq(assistantMessages.userId, ctx.user.id))
-          .orderBy(asc(assistantMessages.createdAt));
-        const context = recent.slice(-6).map((message) => `${message.role === "user" ? "Colaborador" : "Asistente"}: ${message.body}`).join("\n");
+          .orderBy(desc(assistantMessages.createdAt), desc(assistantMessages.id))
+          .limit(6)).reverse();
+        const context = recent.map((message) => `${message.role === "user" ? "Colaborador" : "Asistente"}: ${message.body}`).join("\n");
         const sourceText = documents.map((document, index) => [
           `FUENTE ${index + 1}: ${document.title}`,
           `ENLACE: ${document.url ?? "Recurso interno sin enlace externo"}`,
@@ -123,19 +92,12 @@ export const assistantRouter = createRouter({
         ].join("\n")).join("\n\n---\n\n");
 
         try {
-          const { defaultModelId } = await listModels();
-          const kimiGw = createOpenAICompatible({
-            name: "kimi-gw",
-            baseURL: process.env.KIMI_AGENTGW_BASE_URL!,
-            apiKey: process.env.KIMI_AGENTGW_API_KEY!,
-            includeUsage: true,
-            supportsStructuredOutputs: true,
-          });
           const result = await generateText({
-            model: kimiGw(defaultModelId),
+            model: deepseekModel(),
             system: `Eres el asistente del manual de empresa para los colaboradores de UNITEC USA Design. Responde siempre en español de Colombia, con un tono claro, cercano y respetuoso, sin importar el idioma de la pregunta. Usa ÚNICAMENTE las fuentes públicas del sitio web y los recursos internos publicados por administradores que se suministran aquí. Nunca uses conocimiento externo ni inventes datos del personal, número de empleados, políticas internas, precios, existencias, promociones, fechas, garantías, capacidades o compromisos. No deduzcas servicios o usos no escritos a partir de un canal de contacto o una ubicación. Si las fuentes no responden la pregunta, dilo claramente y sugiere consultar al equipo interno correspondiente. Sé conciso, cálido y práctico, normalmente en menos de 220 palabras. Usa párrafos cortos de texto sencillo o listas simples con guiones. No uses marcadores de Markdown como **, ## ni enlaces en negrita. No afirmes ser humano, abogado ni una aprobación oficial. Distingue los términos públicos del sitio web de las políticas internas de RR. HH. Si la pregunta trata sobre la política de privacidad de otro producto, deja claro ese alcance. No incluyas enlaces en la respuesta; la interfaz muestra por separado los enlaces exactos de las fuentes.`,
             prompt: `${context ? `CONVERSACIÓN RECIENTE (solo contexto; nunca es una fuente factual):\n${context}\n\n` : ""}ÚLTIMA PREGUNTA DEL COLABORADOR:\n${input.question}\n\nFUENTES PÚBLICAS E INTERNAS DE LA EMPRESA:\n${sourceText}`,
-            providerOptions: { "kimi-gw": { max_completion_tokens: 1000 } },
+            // DeepSeek usa max_tokens (no admite max_completion_tokens).
+            maxOutputTokens: 1000,
           });
           answer = result.text.trim();
           if (!answer) throw new Error("El modelo devolvió una respuesta vacía.");
@@ -146,8 +108,8 @@ export const assistantRouter = createRouter({
 
       const db = getDb();
       const saved = await db.transaction(async (tx) => {
-        await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "user", body: input.question, sources: [] });
-        const [{ id }] = await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "assistant", body: answer, sources }).$returningId();
+        await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "user", body: input.question, sources: [], answered: documents.length > 0 });
+        const [{ id }] = await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "assistant", body: answer, sources }).returning({ id: assistantMessages.id });
         return id;
       });
       return { id: saved, answer, sources };
@@ -188,7 +150,7 @@ export const assistantRouter = createRouter({
         await getDb().update(companyResources).set(values).where(eq(companyResources.id, input.id));
         return { id: input.id };
       }
-      const [{ id }] = await getDb().insert(companyResources).values(values).$returningId();
+      const [{ id }] = await getDb().insert(companyResources).values(values).returning({ id: companyResources.id });
       return { id };
     }),
 
@@ -197,6 +159,72 @@ export const assistantRouter = createRouter({
     .mutation(async ({ input }) => {
       await getDb().delete(companyResources).where(eq(companyResources.id, input.id));
       return { ok: true };
+    }),
+
+  // Valoración 👍/👎 de una respuesta propia. null quita la valoración.
+  rate: authedQuery
+    .input(z.object({ id: z.number().int().positive(), feedback: z.enum(["helpful", "unhelpful"]).nullable() }))
+    .mutation(async ({ ctx, input }) => {
+      const message = await getDb().query.assistantMessages.findFirst({
+        where: and(eq(assistantMessages.id, input.id), eq(assistantMessages.userId, ctx.user.id), eq(assistantMessages.role, "assistant")),
+      });
+      if (!message) throw new TRPCError({ code: "NOT_FOUND", message: "No encontramos esa respuesta." });
+      await getDb().update(assistantMessages).set({ feedback: input.feedback }).where(eq(assistantMessages.id, message.id));
+      return { ok: true };
+    }),
+
+  /**
+   * Aprendizaje para administradores: qué pregunta el personal que el manual no cubre
+   * y qué respuestas valoraron como poco útiles. ANÓNIMO: nunca devuelve quién preguntó.
+   * No entrena ningún modelo; sirve para que un administrador publique el recurso que falta.
+   */
+  insights: adminQuery
+    .input(z.object({ days: z.number().int().min(1).max(365).default(90) }).optional())
+    .query(async ({ input }) => {
+      const days = input?.days ?? 90;
+      const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      const db = getDb();
+      const rows = await db.select().from(assistantMessages)
+        .where(gte(assistantMessages.createdAt, since))
+        .orderBy(desc(assistantMessages.id)).limit(5000);
+      const questions = rows.filter((row) => row.role === "user");
+      const answers = rows.filter((row) => row.role === "assistant");
+
+      const gaps = new Map<string, { question: string; count: number; lastAskedAt: Date }>();
+      for (const row of questions.filter((item) => item.answered === false)) {
+        const key = normalize(row.body);
+        const current = gaps.get(key);
+        if (current) current.count += 1;
+        else gaps.set(key, { question: row.body, count: 1, lastAskedAt: row.createdAt });
+      }
+
+      // La pregunta de cada respuesta es el mensaje "user" anterior de la misma persona.
+      const unhelpfulRows = answers.filter((row) => row.feedback === "unhelpful").slice(0, 50);
+      const askerIds = [...new Set(unhelpfulRows.map((row) => row.userId))];
+      const askerQuestions = askerIds.length
+        ? await db.select({ id: assistantMessages.id, userId: assistantMessages.userId, body: assistantMessages.body })
+          .from(assistantMessages)
+          .where(and(inArray(assistantMessages.userId, askerIds), eq(assistantMessages.role, "user"), gte(assistantMessages.createdAt, since)))
+        : [];
+      const unhelpful = unhelpfulRows.map((row) => {
+        const question = askerQuestions
+          .filter((item) => item.userId === row.userId && item.id < row.id)
+          .reduce<typeof askerQuestions[number] | null>((best, item) => (!best || item.id > best.id ? item : best), null);
+        const sources = Array.isArray(row.sources) ? (row.sources as unknown as ManualSource[]).map((source) => source.title) : [];
+        return { id: row.id, question: question?.body ?? "", answer: row.body, sources, createdAt: row.createdAt };
+      });
+
+      return {
+        days,
+        totals: {
+          questions: questions.length,
+          unanswered: questions.filter((row) => row.answered === false).length,
+          helpful: answers.filter((row) => row.feedback === "helpful").length,
+          unhelpful: answers.filter((row) => row.feedback === "unhelpful").length,
+        },
+        gaps: [...gaps.values()].sort((a, b) => b.count - a.count || b.lastAskedAt.getTime() - a.lastAskedAt.getTime()).slice(0, 50),
+        unhelpful,
+      };
     }),
 
   clear: authedQuery.mutation(async ({ ctx }) => {

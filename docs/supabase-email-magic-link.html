@@ -1,0 +1,18 @@
+<!--
+  Plantilla en español para Supabase → Authentication → Emails → "Magic Link".
+  Asunto sugerido: Tu enlace para entrar a Unitec Familia
+  {{ .ConfirmationURL }} y {{ .Email }} los reemplaza Supabase.
+  Si también usas "Confirm signup", pega esta misma plantilla allí (asunto: Confirma tu acceso a Unitec Familia).
+-->
+<div style="font-family: Arial, Helvetica, sans-serif; max-width: 480px; margin: 0 auto; color: #1f2933;">
+  <h2 style="margin-bottom: 8px;">Hola 👋</h2>
+  <p>Recibimos una solicitud para entrar a <strong>Unitec Familia</strong> con el correo {{ .Email }}.</p>
+  <p style="margin: 28px 0;">
+    <a href="{{ .ConfirmationURL }}"
+       style="background: #1d4ed8; color: #ffffff; padding: 12px 22px; border-radius: 6px; text-decoration: none; font-weight: bold;">
+      Entrar a Unitec Familia
+    </a>
+  </p>
+  <p style="font-size: 14px; color: #52606d;">El enlace funciona una sola vez y vence pronto. Si no fuiste tú, ignora este mensaje: nadie podrá entrar sin abrir este enlace.</p>
+  <p style="font-size: 12px; color: #9aa5b1;">UNITEC USA Design · Comunidad interna del personal</p>
+</div>

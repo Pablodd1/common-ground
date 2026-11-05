@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { Camera, ImagePlus, Mic, Paperclip, Square, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/providers/trpc";
+import { supabase } from "@/lib/supabase";
 import { Button } from "@/components/ui/button";
 
 export type Attachment = { key: string; contentType: string; name: string } | null;
@@ -42,12 +43,9 @@ export function useMediaUpload() {
     setIsUploading(true);
     try {
       const target = await createUploadUrl.mutateAsync({ name, contentType, size: file.size });
-      const response = await fetch(target.uploadUrl, {
-        method: "PUT",
-        headers: { "content-type": contentType },
-        body: file,
-      });
-      if (!response.ok) throw new Error("Vercel Blob rechazó el archivo.");
+      const { error } = await supabase.storage.from(target.bucket)
+        .uploadToSignedUrl(target.key, target.token, file, { contentType });
+      if (error) throw new Error(`El almacenamiento rechazó el archivo: ${error.message}`);
       const saved = await completeUpload.mutateAsync({ key: target.key, name, contentType, size: file.size });
       setAttachment({ ...saved, name });
       toast.success("Archivo listo para compartir");

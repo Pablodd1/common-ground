@@ -194,15 +194,31 @@ export type ManualSource = Pick<ManualDocument, "id" | "title" | "url" | "catego
 
 const stopWords = new Set([
   "the", "and", "for", "with", "that", "this", "what", "when", "where", "which", "who", "how", "does", "are", "can", "you", "your", "our", "about", "from", "have", "has", "was", "were", "will", "would", "there", "their", "them", "they", "que", "como", "cual", "cuales", "cuando", "donde", "quien", "quienes", "para", "por", "con", "sin", "una", "uno", "los", "las", "del", "de", "la", "el", "en", "es", "son", "tiene", "tienen", "tengo", "sobre", "nosotros", "usted", "ustedes",
+  "hay", "debo", "puedo", "esta", "este", "estos", "estas", "pero", "mas", "muy", "tambien", "ser", "hacer",
+  "necesito", "quiero", "saber", "algun", "alguna", "alguno", "cuanto", "cuantos", "cuanta", "cuantas", "nos", "les",
 ]);
 
-function normalize(value: string) {
+/**
+ * Raíz sencilla para español: une singular y plural ("vacación"/"vacaciones",
+ * "producto"/"productos", "ciudad"/"ciudades") sin depender de librerías externas.
+ * Se aplica igual a la pregunta y a los documentos, así que basta con ser consistente.
+ */
+export function stem(token: string) {
+  if (token.length > 6 && token.endsWith("ciones")) return token.slice(0, -2);
+  if (token.length > 4 && token.endsWith("es") && /[rlndzj]es$/.test(token)) return token.slice(0, -2);
+  if (token.length > 3 && token.endsWith("s") && !token.endsWith("ss")) return token.slice(0, -1);
+  return token;
+}
+
+const stemSet = (text: string) => new Set(text.split(" ").filter(Boolean).map(stem));
+
+export function normalize(value: string) {
   return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9+]+/g, " ").trim();
 }
 
 export function retrieveManualSources(question: string, limit = 3, additionalDocuments: ManualDocument[] = []): ManualDocument[] {
   const normalized = normalize(question);
-  const tokens = [...new Set(normalized.split(" ").filter((token) => token.length > 2 && !stopWords.has(token)))];
+  const tokens = [...new Set(normalized.split(" ").filter((token) => token.length > 2 && !stopWords.has(token)).map(stem))];
   if (!tokens.length) return [];
 
   return [...companyManual, ...additionalDocuments]
@@ -212,10 +228,10 @@ export function retrieveManualSources(question: string, limit = 3, additionalDoc
       const keywords = normalize(document.keywords);
       const content = normalize(document.content);
       let score = 0;
-      const titleTokens = new Set(title.split(" "));
-      const summaryTokens = new Set(summary.split(" "));
-      const keywordTokens = new Set(keywords.split(" "));
-      const contentTokens = new Set(content.split(" "));
+      const titleTokens = stemSet(title);
+      const summaryTokens = stemSet(summary);
+      const keywordTokens = stemSet(keywords);
+      const contentTokens = stemSet(content);
       for (const token of tokens) {
         if (titleTokens.has(token)) score += 7;
         if (keywordTokens.has(token)) score += 5;
