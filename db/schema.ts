@@ -63,7 +63,10 @@ export const posts = mysqlTable(
     mediaType: varchar("mediaType", { length: 120 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
-  (table) => [index("posts_created_idx").on(table.createdAt)],
+  (table) => [
+    index("posts_created_idx").on(table.createdAt),
+    index("posts_media_idx").on(table.mediaKey),
+  ],
 );
 
 export const likes = mysqlTable(
@@ -76,13 +79,17 @@ export const likes = mysqlTable(
   (table) => [primaryKey({ columns: [table.postId, table.userId] })],
 );
 
-export const comments = mysqlTable("comments", {
-  id: serial("id").primaryKey(),
-  postId: bigint("postId", { mode: "number", unsigned: true }).notNull(),
-  authorId: bigint("authorId", { mode: "number", unsigned: true }).notNull(),
-  body: varchar("body", { length: 1000 }).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+export const comments = mysqlTable(
+  "comments",
+  {
+    id: serial("id").primaryKey(),
+    postId: bigint("postId", { mode: "number", unsigned: true }).notNull(),
+    authorId: bigint("authorId", { mode: "number", unsigned: true }).notNull(),
+    body: varchar("body", { length: 1000 }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("comments_post_idx").on(table.postId, table.createdAt)],
+);
 
 export const conversations = mysqlTable(
   "conversations",
@@ -107,7 +114,10 @@ export const messages = mysqlTable(
     mediaType: varchar("mediaType", { length: 120 }),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
-  (table) => [index("messages_conversation_idx").on(table.conversationId, table.createdAt)],
+  (table) => [
+    index("messages_conversation_idx").on(table.conversationId, table.createdAt),
+    index("messages_media_idx").on(table.mediaKey),
+  ],
 );
 
 export const assistantMessages = mysqlTable(

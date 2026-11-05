@@ -175,7 +175,10 @@
   .post-footer button.liked { color: var(--blue); }
   .comments { margin-top: 12px; padding: 14px; background: color-mix(in srgb, var(--sage) 48%, transparent); border-radius: 8px; }
   .comment { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 12px; }
-  .comment > div { padding-top: 1px; }
+  .comment > div { padding-top: 1px; flex: 1; min-width: 0; }
+  .post-delete, .comment-delete { flex: 0 0 auto; color: var(--muted-copy); }
+  .post-delete:hover, .comment-delete:hover { color: #b42318; }
+  .comment-delete { width: 32px; height: 32px; }
   .comment strong { font-size: 13px; }
   .comment p { font-size: 14px; color: var(--muted-copy); }
   .comment-form { display: flex; align-items: center; gap: 8px; }

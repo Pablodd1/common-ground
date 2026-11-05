@@ -9,6 +9,7 @@ Repositorio: `Pablodd1/common-ground` (privado).
 - Inicio de sesión con Kimi y perfiles persistentes de colaboradores.
 - Publicaciones por temas, fotos, captura con cámara y notas de voz.
 - Me gusta y respuestas en cada publicación.
+- Cada persona puede eliminar sus publicaciones y respuestas; los administradores pueden moderar cualquiera.
 - Búsqueda de personas por nombre, cargo, ubicación e intereses fuera del trabajo.
 - Mensajes individuales de texto, imagen y audio con actualización automática.
 - Calendario de cumpleaños y aniversarios laborales, con publicaciones de celebración.
@@ -56,6 +57,14 @@ npm run check
 npm run build
 npm start
 ```
+
+Pruebas de integración (necesitan un MySQL local; la base indicada se **borra y se recrea** con las migraciones, por eso su nombre debe terminar en `_test`):
+
+```bash
+TEST_DATABASE_URL=mysql://usuario:clave@127.0.0.1:3306/unitec_test npm test
+```
+
+Sin `TEST_DATABASE_URL`, las pruebas se omiten. CI las ejecuta siempre contra MySQL 8.
 
 `npm run build:client` es el comando que usa Vercel. `npm run build` también genera `dist/boot.js` para ejecutar el mismo backend como servidor Node fuera de Vercel.
 

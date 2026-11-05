@@ -15,9 +15,14 @@ export async function findUserByUnionId(unionId: string) {
 
 export async function upsertUser(data: InsertUser) {
   const values = { ...data };
+  // En un inicio de sesión posterior NO se sobrescribe `name`: la persona puede
+  // haberlo cambiado en su perfil y el nombre del proveedor OAuth lo borraría en
+  // cada login. El nombre del proveedor solo se usa al crear la cuenta.
+  const { name: _providerName, ...returning } = data;
+  void _providerName;
   const updateSet: Partial<InsertUser> = {
     lastSignInAt: new Date(),
-    ...data,
+    ...returning,
   };
 
   if (

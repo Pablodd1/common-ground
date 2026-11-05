@@ -22,6 +22,20 @@
       "when": 1793889679915,
       "tag": "0002_flat_havok",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1793900965502,
+      "tag": "0003_base_community_tables",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1793900990613,
+      "tag": "0004_query_indexes",
+      "breakpoints": true
     }
   ]
 }

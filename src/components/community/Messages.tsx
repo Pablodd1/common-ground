@@ -74,7 +74,7 @@ function Thread({ conversationId, other, currentUser, onBack }: { conversationId
     </div>
     <div className="message-composer">
       {media.attachment && <MediaView mediaKey={media.attachment.key} mediaType={media.attachment.contentType} />}
-      <div className="message-input-row"><Textarea rows={1} value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Mensaje para ${other.name.split(" ")[0]}…`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if ((body.trim() || media.attachment) && !media.isUploading) submit(); } }} /><Button size="icon" onClick={submit} disabled={send.isPending || media.isUploading || (!body.trim() && !media.attachment)} aria-label="Enviar mensaje"><Send /></Button></div>
+      <div className="message-input-row"><Textarea rows={1} value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Mensaje para ${other.name.split(" ")[0]}…`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if ((body.trim() || media.attachment) && !media.isUploading && !send.isPending) submit(); } }} /><Button size="icon" onClick={submit} disabled={send.isPending || media.isUploading || (!body.trim() && !media.attachment)} aria-label="Enviar mensaje"><Send /></Button></div>
       <MediaButtons {...media} compact />
     </div>
   </>;

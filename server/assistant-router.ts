@@ -91,7 +91,8 @@ export const assistantRouter = createRouter({
   history: authedQuery.query(async ({ ctx }) => {
     const rows = await getDb().select().from(assistantMessages)
       .where(eq(assistantMessages.userId, ctx.user.id))
-      .orderBy(desc(assistantMessages.createdAt))
+      // La pregunta y la respuesta se guardan en el mismo segundo: el id desempata.
+      .orderBy(desc(assistantMessages.createdAt), desc(assistantMessages.id))
       .limit(100);
     return rows.reverse().map((row) => ({
       ...row,
@@ -111,10 +112,12 @@ export const assistantRouter = createRouter({
         answer = "No encontré esa información en el manual de la empresa ni en los recursos internos publicados por un administrador. No voy a adivinar datos sobre el personal, políticas, precios, contactos o responsabilidades de reporte. Puedes preguntar por la empresa, los productos, las importaciones, los estándares publicados o los canales de contacto; también puedes consultar al equipo interno responsable.";
       } else {
         sources = documents.map(toManualSource);
-        const recent = await getDb().select().from(assistantMessages)
+        // Solo los 6 mensajes más recientes; antes se leía todo el historial para usar 6.
+        const recent = (await getDb().select().from(assistantMessages)
           .where(eq(assistantMessages.userId, ctx.user.id))
-          .orderBy(asc(assistantMessages.createdAt));
-        const context = recent.slice(-6).map((message) => `${message.role === "user" ? "Colaborador" : "Asistente"}: ${message.body}`).join("\n");
+          .orderBy(desc(assistantMessages.createdAt), desc(assistantMessages.id))
+          .limit(6)).reverse();
+        const context = recent.map((message) => `${message.role === "user" ? "Colaborador" : "Asistente"}: ${message.body}`).join("\n");
         const sourceText = documents.map((document, index) => [
           `FUENTE ${index + 1}: ${document.title}`,
           `ENLACE: ${document.url ?? "Recurso interno sin enlace externo"}`,
