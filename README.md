@@ -16,6 +16,7 @@ Repositorio: `Pablodd1/common-ground` (privado).
 - Controles para ocultar el año de nacimiento y la ubicación.
 - Asistente autenticado del manual de empresa, fundamentado en fuentes públicas de UNITEC y recursos internos publicados.
 - Manual, formación, cursos, documentos y directorio de contactos administrables.
+- Aprendizaje del asistente: el personal valora cada respuesta (👍/👎) y los administradores ven, de forma anónima, qué preguntas no tuvieron respuesta o fueron poco útiles, para publicar el recurso que falta con un clic (**Empresa → Aprendizaje**).
 - Creación, edición, publicación, paso a borrador y eliminación de recursos por administradores.
 - Navegación adaptable para escritorio y móviles.
 
@@ -99,6 +100,21 @@ El repositorio queda listo para importar, pero **un despliegue solo existe despu
 
 Nunca pegues los valores reales en GitHub, capturas o conversaciones.
 
+Comprueba que estén completas y coherentes (no muestra los valores):
+
+```bash
+npm run check:env           # lee .env.local y .env
+npm run check:env -- --ci   # solo variables del entorno actual
+```
+
+Recomendaciones:
+
+- `APP_SECRET`: al menos 32 caracteres aleatorios (`openssl rand -base64 48`). Firma sesiones de 1 año; cambiarlo cierra la sesión de todos.
+- `OWNER_UNION_ID`: configúralo antes del primer login del propietario; si no, nadie será administrador.
+- `VITE_*` se publican en el navegador: solo `VITE_APP_ID` y `VITE_KIMI_AUTH_URL`, idénticos a sus pares del servidor. Si cambian, vuelve a desplegar.
+- Usa una base de datos y un Blob distintos para Production y Preview.
+- `KIMI_AUTH_URL` sin `/` final.
+
 | Variable | Uso | Visible en navegador |
 |---|---|---|
 | `APP_ID` | Aplicación OAuth | No |
@@ -118,6 +134,8 @@ Vercel establece `NODE_ENV=production`; no hace falta `PORT` en Vercel. Si conec
 ## Datos, archivos y asistente
 
 MySQL conserva perfiles, publicaciones, mensajes y metadatos de archivos. Vercel Blob conserva los bytes de fotos y audios. Las claves se almacenan, no las URL temporales. Los archivos creados anteriormente en el almacenamiento gestionado por Kimi **no se migran automáticamente** a Vercel Blob.
+
+El asistente no se entrena con las conversaciones: mejora cuando un administrador publica recursos. Las preguntas al asistente y sus valoraciones se muestran a los administradores de forma anónima; los mensajes directos entre colegas nunca se usan para esto. La búsqueda trata igual singular y plural en español (por ejemplo, «vacación» y «vacaciones») e ignora tildes.
 
 El asistente recupera fragmentos de una copia fechada de fuentes públicas y de recursos internos publicados antes de llamar al modelo. No entrena ni ajusta un modelo y no inventa políticas, contactos o conocimiento interno. Las credenciales de IA permanecen en el servidor y las llamadas pueden generar costos. La copia pública fue consultada el 5 de noviembre de 2026; actualiza `server/lib/company-manual.ts` cuando cambie el sitio web.
 

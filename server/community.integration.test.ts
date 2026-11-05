@@ -212,6 +212,28 @@ describe.skipIf(!enabled)("community router (MySQL)", () => {
     })).rejects.toMatchObject({ code: "BAD_REQUEST" });
   });
 
+  it("aprendizaje: preguntas sin respuesta agrupadas y anónimas, solo para administradores", async () => {
+    await caller(alice).assistant.ask({ question: "¿Dónde está el xyzzy frobozz?" });
+    await caller(carol).assistant.ask({ question: "donde esta el XYZZY frobozz" });
+    const insights = await caller(admin).assistant.insights({ days: 30 });
+    const gap = insights.gaps.find((item) => item.question.toLowerCase().includes("xyzzy"))!;
+    expect(gap.count).toBe(2);
+    expect(JSON.stringify(insights)).not.toMatch(/userId|unionId|Alice|Carol/);
+    expect(insights.totals.unanswered).toBeGreaterThanOrEqual(2);
+    await expect(caller(alice).assistant.insights({ days: 30 })).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
+  it("valorar respuestas: solo las propias, y aparecen como poco útiles", async () => {
+    const answer = (await caller(alice).assistant.history()).filter((row) => row.role === "assistant").at(-1)!;
+    await expect(caller(bob).assistant.rate({ id: answer.id, feedback: "unhelpful" })).rejects.toMatchObject({ code: "NOT_FOUND" });
+    await caller(alice).assistant.rate({ id: answer.id, feedback: "unhelpful" });
+    expect((await caller(alice).assistant.history()).find((row) => row.id === answer.id)?.feedback).toBe("unhelpful");
+    const insights = await caller(admin).assistant.insights({ days: 30 });
+    expect(insights.unhelpful.find((item) => item.id === answer.id)?.question).toBe("¿Dónde está el xyzzy frobozz?");
+    await caller(alice).assistant.rate({ id: answer.id, feedback: null });
+    expect((await caller(admin).assistant.insights({ days: 30 })).unhelpful.some((item) => item.id === answer.id)).toBe(false);
+  });
+
   it("el historial del asistente conserva el orden pregunta → respuesta", async () => {
     await m.getDb().insert(m.schema.assistantMessages).values([
       { userId: bob.id, role: "user", body: "pregunta", sources: [] },

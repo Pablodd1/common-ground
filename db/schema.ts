@@ -128,9 +128,16 @@ export const assistantMessages = mysqlTable(
     role: mysqlEnum("role", ["user", "assistant"]).notNull(),
     body: text("body").notNull(),
     sources: json("sources"),
+    // Solo en preguntas: si el asistente encontró fuentes para responder.
+    answered: boolean("answered"),
+    // Solo en respuestas: valoración de quien preguntó.
+    feedback: mysqlEnum("feedback", ["helpful", "unhelpful"]),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
   },
-  (table) => [index("assistant_user_idx").on(table.userId, table.createdAt)],
+  (table) => [
+    index("assistant_user_idx").on(table.userId, table.createdAt),
+    index("assistant_created_idx").on(table.createdAt),
+  ],
 );
 
 export const companyResources = mysqlTable(
