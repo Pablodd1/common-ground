@@ -18,7 +18,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "seed": "tsx db/seed.ts",
-    "build:api": "esbuild server/vercel.ts --platform=node --bundle --format=esm --outfile=dist/api/index.js --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\""
+    "build:api": "esbuild server/vercel.ts --platform=node --bundle --format=esm --outfile=api/index.js --banner:js=\"import { createRequire } from 'module';const require = createRequire(import.meta.url);\""
   },
   "dependencies": {
     "@ai-sdk/openai-compatible": "2.0.78",

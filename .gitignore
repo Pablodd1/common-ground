@@ -33,6 +33,7 @@ dist-ssr
 # TypeScript cache
 *.tsbuildinfo
 # Build outputs
+api/
 dist/
 build/
 # Test coverage
