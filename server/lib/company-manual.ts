@@ -178,7 +178,7 @@ Este resumen no reemplaza los términos legales completos ni una cotización com
     url: "https://www.unitecusadesign.com/politicas/",
     retrievedAt,
     keywords: "privacy privacidad data datos deletion eliminacion eliminación account cuenta building innovation ai app camera camara cámara storage almacenamiento security seguridad tls menores children rights derechos arco habeas",
-    content: `Esta política corresponde a Building Innovation AI y sus servicios web oficiales asociados. No es una política interna de privacidad de la comunidad de colaboradores Common Ground.
+    content: `Esta política corresponde a Building Innovation AI y sus servicios web oficiales asociados. No es una política interna de privacidad de la comunidad de colaboradores Unitec Familia.
 
 La política pública indica que la aplicación puede recopilar información de contacto y perfil, imágenes de cámara o galería autorizadas por el usuario para el procesamiento arquitectónico solicitado, e información técnica y de diagnóstico del dispositivo. Entre las finalidades menciona cálculos de proyectos asistidos por IA, planeación de contenedores, recomendaciones de productos, cotizaciones, atención al cliente, seguridad y actualizaciones opcionales de productos.
 

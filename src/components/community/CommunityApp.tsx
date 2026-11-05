@@ -66,7 +66,7 @@ export function CommunityApp({ onLogout }: { onLogout: () => void }) {
 }
 
 function Brand() {
-  return <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /></span><span>Common<br />Ground</span></div>;
+  return <div className="brand"><span className="brand-mark" aria-hidden="true"><i /><i /></span><span>Unitec<br />Familia</span></div>;
 }
 
 function CommunityPrinciples() {

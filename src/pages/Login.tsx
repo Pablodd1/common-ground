@@ -22,7 +22,7 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center">
       <Card className="w-full max-w-sm">
         <CardHeader className="text-center">
-          <CardTitle>Bienvenido a Common Ground</CardTitle>
+          <CardTitle>Bienvenido a Unitec Familia</CardTitle>
         </CardHeader>
         <CardContent>
           <Button
