@@ -21,19 +21,25 @@ type CompanyResource = typeof companyResources.$inferSelect;
 
 function resourceToDocument(resource: CompanyResource): ManualDocument {
   const contactDetails = resource.kind === "contact" ? [
-    resource.phone ? `Phone / WhatsApp: ${resource.phone}` : "",
-    resource.email ? `Email: ${resource.email}` : "",
-    resource.reportsTo ? `Reports to / escalation: ${resource.reportsTo}` : "",
+    resource.phone ? `Teléfono / WhatsApp: ${resource.phone}` : "",
+    resource.email ? `Correo electrónico: ${resource.email}` : "",
+    resource.reportsTo ? `Reporta a / escalamiento: ${resource.reportsTo}` : "",
   ].filter(Boolean).join("\n") : "";
+  const keywordsByKind = {
+    contact: "contacto contactos teléfono telefono whatsapp correo email reporte reportar reporta escalamiento escalar jefe responsable rr hh recursos humanos ayuda quién quien",
+    course: "curso cursos formación formacion capacitación capacitacion entrenamiento aprendizaje inducción induccion educación educacion enlace",
+    file: "documento documentos archivo archivos enlace formación formacion manual instructivo política politica recurso recursos",
+    document: "política politica políticas politicas estándar estandar estándares estandares procedimiento instructivo instrucciones interno interna rr hh recursos humanos manual",
+  } as const;
   return {
     id: `internal-${resource.id}`,
     resourceId: resource.id,
     title: resource.title,
     category: resource.category,
     summary: resource.summary,
-    url: null,
+    url: resource.kind === "course" || resource.kind === "file" ? resource.url : null,
     retrievedAt: resource.updatedAt.toISOString(),
-    keywords: `${resource.category} ${resource.kind === "contact" ? "contact phone email report reporting escalation manager hr help who" : "policy standard procedure guideline instructions internal hr"}`,
+    keywords: `${resource.category} ${keywordsByKind[resource.kind]}`,
     content: `${resource.summary}\n\n${resource.body}${contactDetails ? `\n\n${contactDetails}` : ""}`,
     body: resource.body,
     visibility: "private",
@@ -55,30 +61,30 @@ function friendlyAiError(error: unknown): TRPCError {
   if (classified instanceof AiUnavailable) {
     return new TRPCError({
       code: "PRECONDITION_FAILED",
-      message: "The company assistant is unavailable because the site's AI quota is exhausted. An administrator needs to add quota in Kimi.",
+      message: "El asistente de la empresa no está disponible porque el cupo de IA del sitio está agotado. Un administrador debe agregar cupo en Kimi.",
       cause: classified,
     });
   }
   if (classified instanceof AiMisconfigured) {
-    return new TRPCError({ code: "PRECONDITION_FAILED", message: "The company assistant needs to be reprovisioned. Please contact the site administrator.", cause: classified });
+    return new TRPCError({ code: "PRECONDITION_FAILED", message: "La configuración del asistente debe restablecerse. Contacta al administrador del sitio.", cause: classified });
   }
   if (classified instanceof ContentRejected) {
-    return new TRPCError({ code: "BAD_REQUEST", message: "That question could not be processed. Please rephrase it using company-related language.", cause: classified });
+    return new TRPCError({ code: "BAD_REQUEST", message: "No pudimos procesar esa pregunta. Reformúlala con información relacionada con la empresa.", cause: classified });
   }
   if (classified instanceof AiTransient) {
-    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The assistant is temporarily unavailable. Your question was not submitted again automatically; please retry deliberately in a moment.", cause: classified });
+    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no está disponible temporalmente. No volvimos a enviar tu pregunta automáticamente; inténtalo de nuevo dentro de un momento.", cause: classified });
   }
   if (classified instanceof AiInvalidRequest) {
-    console.error("Company assistant request error:", classified.message);
-    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The assistant could not process this request. Please try a different question.", cause: classified });
+    console.error("Error en la solicitud del asistente de empresa:", classified.message);
+    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no pudo procesar esta solicitud. Intenta con otra pregunta.", cause: classified });
   }
-  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "The assistant is temporarily unavailable. Please try again later.", cause: classified });
+  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no está disponible temporalmente. Inténtalo de nuevo más tarde.", cause: classified });
 }
 
 export const assistantRouter = createRouter({
   manual: authedQuery.query(async ({ ctx }) => ({
     documents: [...companyManual, ...await loadInternalDocuments(ctx.user.role === "admin")],
-    source: "Public website information and admin-published internal company resources",
+    source: "Información del sitio web público y recursos internos publicados por administradores",
     retrievedAt: "2026-11-05",
   })),
 
@@ -102,17 +108,17 @@ export const assistantRouter = createRouter({
       let sources: ManualSource[] = [];
 
       if (!documents.length) {
-        answer = "I couldn’t find that in the company manual or the internal resources currently published by an administrator. I don’t want to guess about staff, policies, pricing, contacts or reporting responsibilities. Try asking about the company, products, imports, published standards or contact channels—or check with the responsible internal team.";
+        answer = "No encontré esa información en el manual de la empresa ni en los recursos internos publicados por un administrador. No voy a adivinar datos sobre el personal, políticas, precios, contactos o responsabilidades de reporte. Puedes preguntar por la empresa, los productos, las importaciones, los estándares publicados o los canales de contacto; también puedes consultar al equipo interno responsable.";
       } else {
         sources = documents.map(toManualSource);
         const recent = await getDb().select().from(assistantMessages)
           .where(eq(assistantMessages.userId, ctx.user.id))
           .orderBy(asc(assistantMessages.createdAt));
-        const context = recent.slice(-6).map((message) => `${message.role === "user" ? "Employee" : "Assistant"}: ${message.body}`).join("\n");
+        const context = recent.slice(-6).map((message) => `${message.role === "user" ? "Colaborador" : "Asistente"}: ${message.body}`).join("\n");
         const sourceText = documents.map((document, index) => [
-          `SOURCE ${index + 1}: ${document.title}`,
-          `URL: ${document.url}`,
-          `RETRIEVED: ${document.retrievedAt}`,
+          `FUENTE ${index + 1}: ${document.title}`,
+          `ENLACE: ${document.url ?? "Recurso interno sin enlace externo"}`,
+          `FECHA DE CONSULTA O ACTUALIZACIÓN: ${document.retrievedAt}`,
           document.content,
         ].join("\n")).join("\n\n---\n\n");
 
@@ -127,12 +133,12 @@ export const assistantRouter = createRouter({
           });
           const result = await generateText({
             model: kimiGw(defaultModelId),
-            system: `You are the employee company-manual assistant for UNITEC USA Design. Answer using ONLY the supplied public website sources and admin-published internal company resources. Never use outside knowledge and never invent staff details, headcount, internal policies, prices, stock, promotions, dates, warranties, capabilities or commitments. Do not infer unwritten services or uses from a contact channel or location. If the sources do not answer the question, clearly say the public manual does not contain that information and suggest the appropriate internal team. Answer in the same language as the employee's latest question (English or Spanish). Be concise, warm and practical, normally under 220 words. Use short plain-text paragraphs or simple hyphen bullets. Do not use Markdown formatting markers such as **, ## or bold links. Do not claim to be a human, a lawyer, or an official approval. Distinguish public website terms from internal HR policies. When a question is about a separate product privacy policy, keep that scope clear. Do not provide links in the answer; the interface displays the exact source links separately.`,
-            prompt: `${context ? `RECENT CONVERSATION (context only, never a factual source):\n${context}\n\n` : ""}LATEST EMPLOYEE QUESTION:\n${input.question}\n\nPUBLIC COMPANY SOURCES:\n${sourceText}`,
+            system: `Eres el asistente del manual de empresa para los colaboradores de UNITEC USA Design. Responde siempre en español de Colombia, con un tono claro, cercano y respetuoso, sin importar el idioma de la pregunta. Usa ÚNICAMENTE las fuentes públicas del sitio web y los recursos internos publicados por administradores que se suministran aquí. Nunca uses conocimiento externo ni inventes datos del personal, número de empleados, políticas internas, precios, existencias, promociones, fechas, garantías, capacidades o compromisos. No deduzcas servicios o usos no escritos a partir de un canal de contacto o una ubicación. Si las fuentes no responden la pregunta, dilo claramente y sugiere consultar al equipo interno correspondiente. Sé conciso, cálido y práctico, normalmente en menos de 220 palabras. Usa párrafos cortos de texto sencillo o listas simples con guiones. No uses marcadores de Markdown como **, ## ni enlaces en negrita. No afirmes ser humano, abogado ni una aprobación oficial. Distingue los términos públicos del sitio web de las políticas internas de RR. HH. Si la pregunta trata sobre la política de privacidad de otro producto, deja claro ese alcance. No incluyas enlaces en la respuesta; la interfaz muestra por separado los enlaces exactos de las fuentes.`,
+            prompt: `${context ? `CONVERSACIÓN RECIENTE (solo contexto; nunca es una fuente factual):\n${context}\n\n` : ""}ÚLTIMA PREGUNTA DEL COLABORADOR:\n${input.question}\n\nFUENTES PÚBLICAS E INTERNAS DE LA EMPRESA:\n${sourceText}`,
             providerOptions: { "kimi-gw": { max_completion_tokens: 1000 } },
           });
           answer = result.text.trim();
-          if (!answer) throw new Error("The model returned an empty answer.");
+          if (!answer) throw new Error("El modelo devolvió una respuesta vacía.");
         } catch (error) {
           throw friendlyAiError(error);
         }
@@ -150,23 +156,28 @@ export const assistantRouter = createRouter({
   saveResource: adminQuery
     .input(z.object({
       id: z.number().int().positive().optional(),
-      kind: z.enum(["document", "contact"]),
+      kind: z.enum(["document", "contact", "course", "file"]),
       title: z.string().trim().min(2).max(180),
       category: z.string().trim().min(2).max(80),
       summary: z.string().trim().min(2).max(500),
       body: z.string().trim().min(2).max(20000),
+      url: z.string().trim().max(2048).refine((value) => !value || /^https?:\/\//i.test(value), "Ingresa un enlace válido que comience por http:// o https://"),
       phone: z.string().trim().max(60),
       email: z.union([z.literal(""), z.string().trim().email().max(320)]),
       reportsTo: z.string().trim().max(180),
       isPublished: z.boolean(),
     }))
     .mutation(async ({ ctx, input }) => {
+      if ((input.kind === "course" || input.kind === "file") && !input.url) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Agrega el enlace del curso o documento." });
+      }
       const values = {
         kind: input.kind,
         title: input.title,
         category: input.category,
         summary: input.summary,
         body: input.body,
+        url: input.kind === "course" || input.kind === "file" ? input.url : null,
         phone: input.kind === "contact" && input.phone ? input.phone : null,
         email: input.kind === "contact" && input.email ? input.email : null,
         reportsTo: input.kind === "contact" && input.reportsTo ? input.reportsTo : null,

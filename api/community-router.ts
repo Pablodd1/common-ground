@@ -15,7 +15,7 @@ const mediaInput = z.object({
 function publicPerson(person: typeof users.$inferSelect) {
   return {
     id: person.id,
-    name: person.name ?? "New colleague",
+    name: person.name ?? "Nuevo colega",
     avatar: person.avatar,
     avatarKey: person.avatarKey,
     jobTitle: person.jobTitle,
@@ -34,7 +34,7 @@ async function assertMediaOwner(key: string | undefined, userId: number) {
   const owned = await getDb().query.files.findFirst({
     where: and(eq(files.key, key), eq(files.ownerId, userId)),
   });
-  if (!owned) throw new TRPCError({ code: "FORBIDDEN", message: "Upload the media before sharing it." });
+  if (!owned) throw new TRPCError({ code: "FORBIDDEN", message: "Sube el contenido multimedia antes de compartirlo." });
 }
 
 async function assertParticipant(conversationId: number, userId: number) {
@@ -42,7 +42,7 @@ async function assertParticipant(conversationId: number, userId: number) {
     where: eq(conversations.id, conversationId),
   });
   if (!conversation || (conversation.userOneId !== userId && conversation.userTwoId !== userId)) {
-    throw new TRPCError({ code: "FORBIDDEN", message: "You are not part of this conversation." });
+    throw new TRPCError({ code: "FORBIDDEN", message: "No haces parte de esta conversación." });
   }
   return conversation;
 }
@@ -131,7 +131,7 @@ export const communityRouter = createRouter({
       body: z.string().trim().max(2000),
       topic: topicSchema,
       ...mediaInput.shape,
-    }).refine((value) => value.body.length > 0 || value.mediaKey, "Write something or add media."))
+    }).refine((value) => value.body.length > 0 || value.mediaKey, "Escribe algo o agrega contenido multimedia."))
     .mutation(async ({ ctx, input }) => {
       await assertMediaOwner(input.mediaKey, ctx.user.id);
       const [created] = await getDb().insert(posts).values({
@@ -172,11 +172,11 @@ export const communityRouter = createRouter({
   })).mutation(async ({ ctx, input }) => {
     const person = await getDb().query.users.findFirst({ where: eq(users.id, input.personId) });
     if (!person) throw new TRPCError({ code: "NOT_FOUND" });
-    const occasion = input.kind === "birthday" ? "birthday" : "work anniversary";
+    const occasion = input.kind === "birthday" ? "su cumpleaños" : "su aniversario laboral";
     await getDb().insert(posts).values({
       authorId: ctx.user.id,
       topic: "Celebration",
-      body: `Let’s celebrate ${person.name ?? "our colleague"} and their ${occasion} today! Drop a note, a photo, or a voice message to make their day. 🎉`,
+      body: `¡Hoy celebremos a ${person.name ?? "nuestro colega"} por ${occasion}! Deja un mensaje, una foto o una nota de voz para alegrarle el día. 🎉`,
     });
     return { ok: true };
   }),
@@ -202,7 +202,7 @@ export const communityRouter = createRouter({
       if (input.personId === ctx.user.id) throw new TRPCError({ code: "BAD_REQUEST" });
       const db = getDb();
       const person = await db.query.users.findFirst({ where: eq(users.id, input.personId) });
-      if (!person || person.isDemo) throw new TRPCError({ code: "BAD_REQUEST", message: "Sample profiles cannot receive messages." });
+      if (!person || person.isDemo) throw new TRPCError({ code: "BAD_REQUEST", message: "Los perfiles de ejemplo no pueden recibir mensajes." });
       const userOneId = Math.min(ctx.user.id, input.personId);
       const userTwoId = Math.max(ctx.user.id, input.personId);
       let conversation = await db.query.conversations.findFirst({
@@ -226,7 +226,7 @@ export const communityRouter = createRouter({
     conversationId: z.number().int().positive(),
     body: z.string().trim().max(2000),
     ...mediaInput.shape,
-  }).refine((value) => value.body.length > 0 || value.mediaKey, "Write something or add media."))
+  }).refine((value) => value.body.length > 0 || value.mediaKey, "Escribe algo o agrega contenido multimedia."))
     .mutation(async ({ ctx, input }) => {
       await assertParticipant(input.conversationId, ctx.user.id);
       await assertMediaOwner(input.mediaKey, ctx.user.id);
@@ -250,7 +250,7 @@ export const communityRouter = createRouter({
   })).mutation(async ({ ctx, input }) => {
     const bytes = Uint8Array.from(Buffer.from(input.contentBase64, "base64"));
     if (!bytes.length || bytes.length > 12_000_000) {
-      throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Files must be between 1 byte and 12 MB." });
+      throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Los archivos deben pesar entre 1 byte y 12 MB." });
     }
     const safeName = input.name.replace(/[\\/\u0000-\u001f]/g, "-").replace(/\.\./g, "-");
     const saved = await storage.uploadFile({

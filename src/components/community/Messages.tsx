@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { ArrowLeft, MessageCircle, Send, Users } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser, type ConversationItem } from "@/providers/trpc";
@@ -20,18 +21,18 @@ export function Messages({ currentUser, activeConversation, setActiveConversatio
   return (
     <div className={`messages-view ${activeConversation ? "thread-open" : ""}`}>
       <aside className="conversation-list">
-        <div className="messages-heading"><div><p className="meta-label">ONE TO ONE</p><h1>Messages</h1></div><Button variant="outline" size="icon" onClick={onFindPeople} aria-label="Find someone to message"><Users /></Button></div>
-        <p className="messages-note">A quiet space for two. Messages refresh automatically.</p>
+        <div className="messages-heading"><div><p className="meta-label">UNO A UNO</p><h1>Mensajes</h1></div><Button variant="outline" size="icon" onClick={onFindPeople} aria-label="Buscar persona para enviar un mensaje"><Users /></Button></div>
+        <p className="messages-note">Un espacio tranquilo para dos. Los mensajes se actualizan automáticamente.</p>
         {conversations.isLoading && <div className="post-skeleton" />}
-        {!conversations.isLoading && !conversations.data?.length && <div className="conversation-empty"><MessageCircle /><h2>No conversations yet</h2><p>Find a colleague and say hello.</p><Button onClick={onFindPeople}>Find people</Button></div>}
+        {!conversations.isLoading && !conversations.data?.length && <div className="conversation-empty"><MessageCircle /><h2>Aún no hay conversaciones</h2><p>Busca un colega y salúdalo.</p><Button onClick={onFindPeople}>Buscar personas</Button></div>}
         {conversations.data?.map((conversation) => conversation.other && <button className={`conversation-item ${activeConversation === conversation.id ? "active" : ""}`} key={conversation.id} onClick={() => setActiveConversation(conversation.id)}>
           <PersonAvatar person={conversation.other} />
-          <span><strong>{conversation.other.name}</strong><small>{conversation.lastMessage?.body || (conversation.lastMessage?.mediaKey ? "Shared an attachment" : "Start the conversation")}</small></span>
-          {conversation.lastMessage && <time>{formatDistanceToNow(conversation.lastMessage.createdAt)}</time>}
+          <span><strong>{conversation.other.name}</strong><small>{conversation.lastMessage?.body || (conversation.lastMessage?.mediaKey ? "Compartió un archivo" : "Inicia la conversación")}</small></span>
+          {conversation.lastMessage && <time>{formatDistanceToNow(conversation.lastMessage.createdAt, { locale: es })}</time>}
         </button>)}
       </aside>
       <section className="message-thread">
-        {selected?.other ? <Thread key={selected.id} conversationId={selected.id} other={selected.other} currentUser={currentUser} onBack={() => setActiveConversation(null)} /> : <div className="thread-placeholder"><MessageCircle /><h2>Your conversation starts here.</h2><p>Choose a message or find someone new to talk to.</p><Button onClick={onFindPeople}>Find people</Button></div>}
+        {selected?.other ? <Thread key={selected.id} conversationId={selected.id} other={selected.other} currentUser={currentUser} onBack={() => setActiveConversation(null)} /> : <div className="thread-placeholder"><MessageCircle /><h2>Tu conversación empieza aquí.</h2><p>Elige un mensaje o busca a alguien nuevo para hablar.</p><Button onClick={onFindPeople}>Buscar personas</Button></div>}
       </section>
     </div>
   );
@@ -60,20 +61,20 @@ function Thread({ conversationId, other, currentUser, onBack }: { conversationId
   }
 
   return <>
-    <header className="thread-header"><Button variant="ghost" size="icon" className="thread-back" onClick={onBack} aria-label="Back to conversations"><ArrowLeft /></Button><PersonAvatar person={other} /><div><strong>{other.name}</strong><p>{other.jobTitle || "Colleague"}</p></div></header>
+    <header className="thread-header"><Button variant="ghost" size="icon" className="thread-back" onClick={onBack} aria-label="Volver a conversaciones"><ArrowLeft /></Button><PersonAvatar person={other} /><div><strong>{other.name}</strong><p>{other.jobTitle || "Colega"}</p></div></header>
     <div className="message-history" aria-live="polite">
-      {messages.isLoading && <p className="muted-copy">Loading messages…</p>}
-      {!messages.isLoading && !messages.data?.length && <div className="first-message"><PersonAvatar person={other} size="lg" /><h2>Say hello to {other.name.split(" ")[0]}.</h2><p>You both have {other.interests[0] ? `an interest in ${other.interests[0]} to start with` : "plenty to discover about each other"}.</p></div>}
+      {messages.isLoading && <p className="muted-copy">Cargando mensajes…</p>}
+      {!messages.isLoading && !messages.data?.length && <div className="first-message"><PersonAvatar person={other} size="lg" /><h2>Saluda a {other.name.split(" ")[0]}.</h2><p>Los dos tienen {other.interests[0] ? `un interés en ${other.interests[0]} para comenzar` : "mucho por descubrir el uno del otro"}.</p></div>}
       {messages.data?.map((message) => <div className={`message-bubble ${message.senderId === currentUser.id ? "mine" : "theirs"}`} key={message.id}>
         {message.body && <p>{message.body}</p>}
         {message.mediaKey && <MediaView mediaKey={message.mediaKey} mediaType={message.mediaType} />}
-        <time>{formatDistanceToNow(message.createdAt, { addSuffix: true })}</time>
+        <time>{formatDistanceToNow(message.createdAt, { addSuffix: true, locale: es })}</time>
       </div>)}
       <div ref={endRef} />
     </div>
     <div className="message-composer">
       {media.attachment && <MediaView mediaKey={media.attachment.key} mediaType={media.attachment.contentType} />}
-      <div className="message-input-row"><Textarea rows={1} value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Message ${other.name.split(" ")[0]}…`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if ((body.trim() || media.attachment) && !media.isUploading) submit(); } }} /><Button size="icon" onClick={submit} disabled={send.isPending || media.isUploading || (!body.trim() && !media.attachment)} aria-label="Send message"><Send /></Button></div>
+      <div className="message-input-row"><Textarea rows={1} value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Mensaje para ${other.name.split(" ")[0]}…`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if ((body.trim() || media.attachment) && !media.isUploading) submit(); } }} /><Button size="icon" onClick={submit} disabled={send.isPending || media.isUploading || (!body.trim() && !media.attachment)} aria-label="Enviar mensaje"><Send /></Button></div>
       <MediaButtons {...media} compact />
     </div>
   </>;

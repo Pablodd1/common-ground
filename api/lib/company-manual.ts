@@ -1,4 +1,4 @@
-export type ManualCategory = "Company" | "Products" | "Buying & logistics" | "Policies" | "Contact";
+export type ManualCategory = "Empresa" | "Productos" | "Compras y logística" | "Políticas" | "Contacto";
 
 export interface ManualDocument {
   id: string;
@@ -11,7 +11,7 @@ export interface ManualDocument {
   content: string;
   body?: string;
   visibility?: "public" | "private";
-  kind?: "document" | "contact";
+  kind?: "document" | "contact" | "course" | "file";
   resourceId?: number;
   isPublished?: boolean;
   phone?: string | null;
@@ -24,176 +24,176 @@ const retrievedAt = "2026-11-05";
 export const companyManual: ManualDocument[] = [
   {
     id: "company-overview",
-    title: "Company overview, mission and vision",
-    category: "Company",
-    summary: "Who UNITEC USA Design serves, what it does, and the principles behind its work.",
+    title: "Presentación, misión y visión de la empresa",
+    category: "Empresa",
+    summary: "A quién sirve UNITEC USA Design, qué hace y cuáles son los principios que orientan su trabajo.",
     url: "https://www.unitecusadesign.com/nosotros/",
     retrievedAt,
-    keywords: "about nosotros empresa compañia company mision mission vision proposito values valores subsidiary filial building innovation architects arquitectos employees staff collaborators",
-    content: `UNITEC USA Design develops, imports and sells materials for construction, remodeling and interior and exterior design. Its portfolio includes practical, durable and visually attractive alternatives in PVC, WPC and complementary lines for homes, businesses and institutional projects.
+    keywords: "about nosotros empresa compañia compañía company mision misión mission vision visión proposito propósito values valores subsidiary filial building innovation architects arquitectos employees staff collaborators colaboradores",
+    content: `UNITEC USA Design desarrolla, importa y comercializa materiales para construcción, remodelación y diseño de interiores y exteriores. Su portafolio incluye alternativas prácticas, duraderas y visualmente atractivas en PVC, WPC y líneas complementarias para viviendas, comercios y proyectos institucionales.
 
-The homepage describes UNITEC USA Design as the Colombia and Latin America subsidiary of Building Innovation. For more than 20 years it has supported designers, architects, builders, distributors and importers with logistics and construction solutions.
+La página principal describe a UNITEC USA Design como la filial para Colombia y Latinoamérica de Building Innovation. Durante más de 20 años ha acompañado a diseñadores, arquitectos, constructores, distribuidores e importadores con soluciones logísticas y de construcción.
 
-Mission: To provide innovative and sustainable solutions for construction and remodeling, with high-quality products that create value for customers, partners, collaborators and communities.
+Misión: ofrecer soluciones innovadoras y sostenibles para la construcción y la remodelación, con productos de alta calidad que generen valor para clientes, aliados, colaboradores y comunidades.
 
-Vision: To become a leading brand in construction solutions across the Americas, recognized for innovation, reliability, commercial closeness and the ability to adapt to each market.
+Visión: convertirse en una marca líder en soluciones para la construcción en las Américas, reconocida por su innovación, confiabilidad, cercanía comercial y capacidad de adaptación a cada mercado.
 
-The company says its products are designed to simplify installation, reduce construction times and meet real customer needs. Its stated principles include innovation, quality, durability, sustainability and commercial support.`,
+La empresa afirma que sus productos están diseñados para simplificar la instalación, reducir los tiempos de obra y responder a las necesidades reales de los clientes. Entre sus principios declarados están la innovación, la calidad, la durabilidad, la sostenibilidad y el acompañamiento comercial.`,
   },
   {
     id: "company-history",
-    title: "Our history and international growth",
-    category: "Company",
-    summary: "Milestones from the company's beginnings in 2006 to its international expansion.",
+    title: "Nuestra historia y crecimiento internacional",
+    category: "Empresa",
+    summary: "Hitos desde los inicios de la empresa en 2006 hasta su expansión internacional.",
     url: "https://www.unitecusadesign.com/nosotros/historia/",
     retrievedAt,
-    keywords: "history historia founded fundada when cuando 2006 2016 2019 2020 2024 countries paises expansion growth crecimiento international internacional",
-    content: `The company's public timeline presents these milestones:
+    keywords: "history historia founded fundada when cuando 2006 2016 2019 2020 2024 countries paises países expansion expansión growth crecimiento international internacional",
+    content: `La cronología pública de la empresa presenta estos hitos:
 
-2006 — The beginnings: technology and operations between Colombia and the United States.
-2016 — A new direction: entry into the construction market with aluminum profiles.
-2016–2018 — Innovation in PVC: identification of an opportunity for lighter, more versatile and efficient materials.
-2019–2020 — Looking beyond: first exports and the beginning of international expansion.
-2021–2023 — Growth with partners in Venezuela, El Salvador, Guatemala, Honduras, Ecuador and Peru.
-2024 onward — International presence: operations in the United States and expansion into new markets.
+2006 — Los inicios: tecnología y operaciones entre Colombia y Estados Unidos.
+2016 — Una nueva dirección: entrada al mercado de la construcción con perfiles de aluminio.
+2016–2018 — Innovación en PVC: identificación de una oportunidad para materiales más livianos, versátiles y eficientes.
+2019–2020 — Mirar más allá: primeras exportaciones e inicio de la expansión internacional.
+2021–2023 — Crecimiento con aliados en Venezuela, El Salvador, Guatemala, Honduras, Ecuador y Perú.
+Desde 2024 — Presencia internacional: operaciones en Estados Unidos y expansión hacia nuevos mercados.
 
-The company says it now connects innovation, design and logistics to make construction more efficient. Its history page identifies operations or markets including Doral/Miami in the United States; Medellín in Colombia; Barquisimeto in Venezuela; Quito and Guayaquil in Ecuador; Santo Domingo in the Dominican Republic; San Salvador in El Salvador; Lima in Peru; and Guatemala and Honduras.`,
+La empresa afirma que hoy conecta innovación, diseño y logística para hacer la construcción más eficiente. Su página de historia menciona operaciones o mercados como Doral/Miami en Estados Unidos; Medellín en Colombia; Barquisimeto en Venezuela; Quito y Guayaquil en Ecuador; Santo Domingo en República Dominicana; San Salvador en El Salvador; Lima en Perú; y Guatemala y Honduras.`,
   },
   {
     id: "materials-performance",
-    title: "Materials, quality and sustainability",
-    category: "Products",
-    summary: "Public product-performance, maintenance, durability and environmental statements.",
+    title: "Materiales, calidad y sostenibilidad",
+    category: "Productos",
+    summary: "Declaraciones públicas sobre desempeño, mantenimiento, durabilidad y aspectos ambientales de los productos.",
     url: "https://www.unitecusadesign.com/nosotros/",
     retrievedAt,
-    keywords: "quality calidad durable durabilidad waterproof impermeable recyclable reciclable fire fuego maintenance mantenimiento pintura solvents solventes chemicals quimicos iso 9001 15 25 years años sustainable sostenible pvc wpc",
-    content: `UNITEC states that its material lines are designed for daily use, efficient installation, modern finishes and low maintenance.
+    keywords: "quality calidad durable durabilidad waterproof impermeable recyclable reciclable fire fuego maintenance mantenimiento pintura solvents solventes chemicals quimicos químicos iso 9001 15 25 years años sustainable sostenible pvc wpc",
+    content: `UNITEC afirma que sus líneas de materiales están diseñadas para el uso diario, una instalación eficiente, acabados modernos y bajo mantenimiento.
 
-The public company page lists these product-level statements: fast installation; no maintenance with paints, solvents or chemicals; durability between 15 and 25 years; fire resistance; manufacture with recovered materials and 100% recyclability; and 100% waterproof performance.
+La página pública de la empresa incluye estas declaraciones sobre los productos: instalación rápida; ausencia de mantenimiento con pinturas, solventes o químicos; durabilidad entre 15 y 25 años; resistencia al fuego; fabricación con materiales recuperados y reciclabilidad del 100 %; y desempeño 100 % impermeable.
 
-The company says it promotes materials that can reduce maintenance, optimize resources and reduce environmental impact compared with traditional alternatives. It also states that its products are manufactured under quality standards and ISO 9001 certification.
+La empresa señala que promueve materiales que pueden reducir el mantenimiento, optimizar recursos y disminuir el impacto ambiental frente a alternativas tradicionales. También afirma que sus productos se fabrican bajo estándares de calidad y certificación ISO 9001.
 
-These are the company's public statements, not an independent technical assessment. Employees should check the relevant product technical sheet for project-specific specifications, limitations and installation requirements.`,
+Estas son declaraciones públicas de la empresa, no una evaluación técnica independiente. Los colaboradores deben consultar la ficha técnica correspondiente para conocer las especificaciones, limitaciones y requisitos de instalación de cada proyecto.`,
   },
   {
     id: "product-portfolio",
-    title: "Product portfolio and technical resources",
-    category: "Products",
-    summary: "Interior and exterior product families, catalog resources and technical-sheet guidance.",
+    title: "Portafolio de productos y recursos técnicos",
+    category: "Productos",
+    summary: "Familias de productos para interiores y exteriores, catálogos y orientación sobre fichas técnicas.",
     url: "https://www.unitecusadesign.com/colecciones/",
     retrievedAt,
-    keywords: "products productos catalog catalogo colecciones collections interior exterior walls paredes laminas sheets floors pisos deck spc wpc pvc upvc ceilings cielo raso lighting iluminacion adhesives pegantes gardens jardines samples muestras technical ficha specifications especificaciones",
-    content: `The public collection navigation lists these interior product families: wall panels and wall finishes; PVC marble and synthetic sheets; foam board and PVC board; artificial gardens; WPC panels and angles; SPC floors; SPC baseboards; PVC ceilings; adhesive tapes; lighting; PVC interior strips; and mounting adhesives.
+    keywords: "products productos catalog catalogo catálogo colecciones collections interior exterior walls paredes laminas láminas sheets floors pisos deck spc wpc pvc upvc ceilings cielo raso lighting iluminacion iluminación adhesives pegantes gardens jardines samples muestras technical ficha specifications especificaciones",
+    content: `La navegación pública de colecciones incluye estas familias de productos para interiores: paneles y revestimientos de pared; mármol PVC y láminas sintéticas; foam board y láminas de PVC; jardines artificiales; paneles y ángulos WPC; pisos SPC; rodapiés SPC; cielos rasos de PVC; cintas adhesivas; iluminación; listones interiores de PVC; y adhesivos de montaje.
 
-Exterior families include UPVC roofing; exterior wall and façade systems; artificial gardens; exterior WPC panels and angles; deck flooring; and exterior WPC strips.
+Las familias para exteriores incluyen cubiertas UPVC; sistemas de pared y fachada exterior; jardines artificiales; paneles y ángulos WPC para exterior; pisos deck; y listones exteriores WPC.
 
-The website offers a 2026 Spanish catalog and downloadable technical sheets for many product families. The company advises customers to use the technical sheet beside each item when choosing references. Customers can request personal advice, tailored technical sheets, product samples and project quotations through an advisor.
+El sitio web ofrece un catálogo en español de 2026 y fichas técnicas descargables para muchas familias de productos. La empresa recomienda utilizar la ficha técnica junto a cada referencia al momento de elegir. Los clientes pueden solicitar asesoría personalizada, fichas técnicas específicas, muestras de productos y cotizaciones de proyectos a través de un asesor.
 
-The collections page is the appropriate starting point for current product availability and detailed specifications. Do not assume that every listed reference is in stock; confirm current availability with the commercial team.`,
+La página de colecciones es el punto de partida para consultar la disponibilidad actual y las especificaciones detalladas. No se debe suponer que todas las referencias listadas tienen existencias; la disponibilidad vigente debe confirmarse con el equipo comercial.`,
   },
   {
     id: "container-importing",
-    title: "Buying by container and importing",
-    category: "Buying & logistics",
-    summary: "How container planning, mixed loads, quotations and delivery options work.",
+    title: "Compras por contenedor e importaciones",
+    category: "Compras y logística",
+    summary: "Cómo funcionan la planeación de contenedores, las cargas mixtas, las cotizaciones y las opciones de entrega.",
     url: "https://www.unitecusadesign.com/",
     retrievedAt,
-    keywords: "import importar importing container contenedor containers contenedores 20 40 feet pies cubic cubicaje volume volumen buy comprar purchase order pedido quote cotizacion shipping envio freight flete mixed mezclar showroom recoger traceability trazabilidad",
-    content: `The public homepage describes a container-based purchasing process:
+    keywords: "import importar importing container contenedor containers contenedores 20 40 feet pies cubic cubicaje volume volumen buy comprar purchase order pedido quote cotizacion cotización shipping envio envío freight flete mixed mezclar showroom recoger traceability trazabilidad",
+    content: `La página principal pública describe este proceso de compra por contenedor:
 
-1. Choose one or more catalog references, using each item's technical sheet to support the decision.
-2. Review how much container space each product occupies and how much capacity remains.
-3. Collect products from the Medellín showroom when the purchase was handled directly with an advisor, or import by sea with traceability under the chosen Incoterm, FOB or CIF.
+1. Elegir una o varias referencias del catálogo, utilizando la ficha técnica de cada producto como apoyo para la decisión.
+2. Revisar cuánto espacio ocupa cada producto dentro del contenedor y cuánta capacidad queda disponible.
+3. Recoger los productos en el showroom de Medellín cuando la compra se gestionó directamente con un asesor, o importar por vía marítima con trazabilidad bajo el Incoterm elegido, FOB o CIF.
 
-The platform plans purchases in cubic meters rather than individual units. Customers can mix floors, panels, profiles and finishes in one container. The company says this helps customers understand their real import volume before paying and reduce the unit cost by using available capacity.
+La plataforma planifica las compras en metros cúbicos y no en unidades individuales. Los clientes pueden combinar pisos, paneles, perfiles y acabados en un mismo contenedor. Según la empresa, esto ayuda a conocer el volumen real de importación antes de pagar y a reducir el costo unitario aprovechando la capacidad disponible.
 
-The homepage says the quoted container load is what is dispatched and describes no hidden surcharges or later adjustments. Orders remain subject to the commercial terms, product availability and final accepted quotation.
+La página principal indica que la carga del contenedor cotizada es la que se despacha y describe que no hay recargos ocultos ni ajustes posteriores. Los pedidos siguen sujetos a las condiciones comerciales, la disponibilidad de los productos y la cotización final aceptada.
 
-The international-coverage page states that 20-foot containers have 33 m³ capacity and 40-foot High Cube containers have 76 m³ capacity. Product-specific capacities should be checked against the relevant technical or import guide.`,
+La página de cobertura internacional señala que los contenedores de 20 pies tienen una capacidad de 33 m³ y los contenedores High Cube de 40 pies, de 76 m³. Las capacidades específicas por producto deben verificarse en la guía técnica o de importación correspondiente.`,
   },
   {
     id: "incoterms-business",
-    title: "FOB, CIF and commercial partnerships",
-    category: "Buying & logistics",
-    summary: "The difference between FOB and CIF and the company's public partner models.",
+    title: "FOB, CIF y alianzas comerciales",
+    category: "Compras y logística",
+    summary: "Diferencia entre FOB y CIF y modelos públicos de alianza con la empresa.",
     url: "https://www.unitecusadesign.com/nosotros/business-models/",
     retrievedAt,
     keywords: "fob cif incoterm incoterms free on board cost insurance freight flete seguro puerto port business negocio partners aliados distributors distribuidores marketers comercializadores builders constructores architects arquitectos international socios discount descuento margin margen",
-    content: `FOB (Free on Board): UNITEC manages the goods until they are loaded aboard the vessel at the port of shipment. The customer controls ocean freight and insurance from that point. The company describes this as suitable for experienced importers.
+    content: `FOB (Free on Board): UNITEC gestiona la mercancía hasta que queda cargada a bordo del buque en el puerto de embarque. A partir de ese punto, el cliente controla el flete marítimo y el seguro. La empresa lo describe como una opción adecuada para importadores con experiencia.
 
-CIF (Cost, Insurance and Freight): UNITEC manages cost, insurance and freight to the destination port, providing a more integrated shipping service.
+CIF (Cost, Insurance and Freight): UNITEC gestiona el costo, el seguro y el flete hasta el puerto de destino, lo que ofrece un servicio de transporte más integrado.
 
-Public partnership models include:
-• Distributors: exclusive and non-exclusive regional distribution agreements, wholesale pricing, marketing support, territory options and priority product access.
-• Commercial partners/marketers: margin protection, point-of-sale material, product training and inventory support.
-• Builders and architects: volume and project pricing, specialized technical advice, priority delivery and volume discounts.
-• International partners: export documentation, customs assistance, pricing in multiple currencies and global logistics coordination.
+Los modelos públicos de alianza incluyen:
+• Distribuidores: acuerdos regionales de distribución exclusivos y no exclusivos, precios mayoristas, apoyo de mercadeo, opciones de territorio y acceso prioritario a productos.
+• Aliados comerciales/comercializadores: protección de márgenes, material para el punto de venta, formación sobre productos y apoyo de inventario.
+• Constructores y arquitectos: precios por volumen y proyecto, asesoría técnica especializada, entrega prioritaria y descuentos por volumen.
+• Aliados internacionales: documentación de exportación, apoyo aduanero, precios en varias monedas y coordinación logística global.
 
-Specific prices, territories, discounts, delivery commitments and partnership conditions require direct confirmation with the sales team.`,
+Los precios, territorios, descuentos, compromisos de entrega y condiciones específicas de las alianzas requieren confirmación directa con el equipo comercial.`,
   },
   {
     id: "coverage-contact",
-    title: "Locations, coverage and commercial contact",
-    category: "Contact",
-    summary: "Miami and Medellín locations, market coverage and public contact channels.",
+    title: "Ubicaciones, cobertura y contacto comercial",
+    category: "Contacto",
+    summary: "Ubicaciones en Miami y Medellín, cobertura de mercados y canales públicos de contacto.",
     url: "https://www.unitecusadesign.com/contacto/",
     retrievedAt,
-    keywords: "contact contacto phone telefono whatsapp email correo address direccion location ubicacion showroom medellin itagui miami doral florida hours horario countries paises coverage cobertura",
-    content: `United States office: 6120 NW 74th Ave, Doral, FL 33166, Miami, United States.
+    keywords: "contact contacto phone telefono teléfono whatsapp email correo address direccion dirección location ubicacion ubicación showroom medellin medellín itagui itagüí miami doral florida hours horario countries paises países coverage cobertura",
+    content: `Oficina en Estados Unidos: 6120 NW 74th Ave, Doral, FL 33166, Miami, Estados Unidos.
 
-Medellín showroom: Carrera 42, Auto. S #75-83, C.C. IDEO Local 274, Itagüí, Medellín, Antioquia, Colombia.
+Showroom de Medellín: Carrera 42, Auto. S #75-83, C.C. IDEO Local 274, Itagüí, Medellín, Antioquia, Colombia.
 
-Main commercial line and WhatsApp: +57 314 233 2147.
-Corporate email published on the FAQ: lidermercadeo@espaciosimportados.com.co.
+Línea comercial principal y WhatsApp: +57 314 233 2147.
+Correo corporativo publicado en las preguntas frecuentes: lidermercadeo@espaciosimportados.com.co.
 
-The FAQ says the company offers FOB from origin ports in China, CIF to destination ports in Latin America and the Caribbean, and direct dispatch from Miami and Medellín. It directs customers to the commercial and engineering team for container consolidation and volume-based quotations.
+Las preguntas frecuentes indican que la empresa ofrece FOB desde puertos de origen en China, CIF hacia puertos de destino en Latinoamérica y el Caribe, y despacho directo desde Miami y Medellín. Remiten al equipo comercial y de ingeniería para la consolidación de contenedores y las cotizaciones por volumen.
 
-The company reports serving the United States, Colombia, Venezuela, Ecuador, the Dominican Republic, El Salvador, Guatemala, Honduras and Peru. For privacy matters concerning Building Innovation AI, the privacy page lists lidermarketingonline@espaciosimportados.com.co and info@unitecusadesign.com, with service Monday to Friday, 8:00 AM–5:00 PM COT.`,
+La empresa declara atender Estados Unidos, Colombia, Venezuela, Ecuador, República Dominicana, El Salvador, Guatemala, Honduras y Perú. Para asuntos de privacidad relacionados con Building Innovation AI, la página de privacidad publica lidermarketingonline@espaciosimportados.com.co e info@unitecusadesign.com, con atención de lunes a viernes, de 8:00 a. m. a 5:00 p. m., hora de Colombia.`,
   },
   {
     id: "commercial-terms",
-    title: "Website and commercial terms",
-    category: "Policies",
-    summary: "Public terms on pricing, payment, orders, delivery, returns and warranty.",
+    title: "Términos del sitio web y condiciones comerciales",
+    category: "Políticas",
+    summary: "Términos públicos sobre precios, pagos, pedidos, entregas, devoluciones y garantías.",
     url: "https://www.unitecusadesign.com/terminos/",
     retrievedAt,
-    keywords: "terms terminos conditions condiciones prices precios usd payment pago credit credito delivery entrega returns devoluciones refund reembolso warranty garantia damage daños cancellation cancelacion",
-    content: `The public website terms state:
+    keywords: "terms terminos términos conditions condiciones prices precios usd payment pago credit credito crédito delivery entrega returns devoluciones refund reembolso warranty garantia garantía damage daños cancellation cancelacion cancelación",
+    content: `Los términos públicos del sitio web establecen:
 
-• Product descriptions, specifications, colors and availability may contain inaccuracies and may be changed or discontinued without prior notice.
-• Prices are in USD and may change without notice. Shipping, taxes and duties are not included unless specifically stated.
-• Payment is due at the time of order unless credit terms are approved. Orders may be canceled for non-payment.
-• Orders are subject to acceptance and availability. Delivery dates are estimates, not guarantees. Risk of loss transfers to the carrier at shipment. Customers should inspect deliveries and report damage promptly.
-• Standard products may be eligible for return within 30 days, subject to condition and restocking fees. Custom orders are non-refundable.
-• Products have limited warranties as specified. Warranty claims are limited to repair, replacement or refund.
-• Questions about these terms can be sent to lidermercadeo@espaciosimportados.com.co.
+• Las descripciones, especificaciones, colores y la disponibilidad de los productos pueden contener imprecisiones y pueden cambiarse o descontinuarse sin previo aviso.
+• Los precios están expresados en USD y pueden cambiar sin previo aviso. Los envíos, impuestos y aranceles no están incluidos, salvo que se indique expresamente.
+• El pago se exige al momento del pedido, salvo que se aprueben condiciones de crédito. Los pedidos pueden cancelarse por falta de pago.
+• Los pedidos están sujetos a aceptación y disponibilidad. Las fechas de entrega son estimaciones, no garantías. El riesgo de pérdida se transfiere al transportador en el momento del envío. Los clientes deben inspeccionar las entregas y reportar oportunamente cualquier daño.
+• Los productos estándar pueden ser elegibles para devolución dentro de los 30 días, sujetos a su estado y a cargos por reposición. Los pedidos personalizados no son reembolsables.
+• Los productos tienen las garantías limitadas especificadas. Las reclamaciones de garantía se limitan a reparación, reemplazo o reembolso.
+• Las preguntas sobre estos términos pueden enviarse a lidermercadeo@espaciosimportados.com.co.
 
-This summary does not replace the full legal terms or an accepted commercial quotation.`,
+Este resumen no reemplaza los términos legales completos ni una cotización comercial aceptada.`,
   },
   {
     id: "building-ai-privacy",
-    title: "Building Innovation AI privacy policy",
-    category: "Policies",
-    summary: "Public privacy terms for the separate Building Innovation AI application and associated web services.",
+    title: "Política de privacidad de Building Innovation AI",
+    category: "Políticas",
+    summary: "Términos públicos de privacidad para la aplicación independiente Building Innovation AI y sus servicios web asociados.",
     url: "https://www.unitecusadesign.com/politicas/",
     retrievedAt,
-    keywords: "privacy privacidad data datos deletion eliminacion account cuenta building innovation ai app camera camara storage almacenamiento security seguridad tls menores children rights derechos arco habeas",
-    content: `This policy concerns Building Innovation AI and its associated official web services. It is not an internal Common Ground employee-community privacy policy.
+    keywords: "privacy privacidad data datos deletion eliminacion eliminación account cuenta building innovation ai app camera camara cámara storage almacenamiento security seguridad tls menores children rights derechos arco habeas",
+    content: `Esta política corresponde a Building Innovation AI y sus servicios web oficiales asociados. No es una política interna de privacidad de la comunidad de colaboradores Common Ground.
 
-The public policy says the app may collect contact/profile information, user-authorized camera or gallery images for requested architectural processing, and technical/diagnostic device information. It lists purposes including AI-assisted project calculations, container planning, product recommendations, quotations, customer support, security and optional product updates.
+La política pública indica que la aplicación puede recopilar información de contacto y perfil, imágenes de cámara o galería autorizadas por el usuario para el procesamiento arquitectónico solicitado, e información técnica y de diagnóstico del dispositivo. Entre las finalidades menciona cálculos de proyectos asistidos por IA, planeación de contenedores, recomendaciones de productos, cotizaciones, atención al cliente, seguridad y actualizaciones opcionales de productos.
 
-The company says it does not sell, rent or commercially transfer user personal data to data brokers or unrelated for-profit companies. Trusted technology providers may process information under confidentiality and data-protection agreements. Communications are described as using HTTPS/TLS.
+La empresa afirma que no vende, alquila ni transfiere comercialmente los datos personales de los usuarios a intermediarios de datos o empresas lucrativas no relacionadas. Proveedores tecnológicos de confianza pueden procesar información bajo acuerdos de confidencialidad y protección de datos. Las comunicaciones se describen como protegidas mediante HTTPS/TLS.
 
-Users may request complete deletion of their Building Innovation AI account and associated personal data by emailing lidermarketingonline@espaciosimportados.com.co with the subject “Solicitud de Eliminación de Datos - Building Innovation AI”. The policy states a processing period of 15 to 30 calendar days.
+Los usuarios pueden solicitar la eliminación completa de su cuenta de Building Innovation AI y de los datos personales asociados escribiendo a lidermarketingonline@espaciosimportados.com.co con el asunto “Solicitud de Eliminación de Datos - Building Innovation AI”. La política establece un plazo de procesamiento de 15 a 30 días calendario.
 
-The page also describes rights to know, update, rectify, revoke authorization and request deletion. It states the app is directed to construction professionals and adults, and gives privacy support hours of Monday to Friday, 8:00 AM–5:00 PM COT.`,
+La página también describe los derechos a conocer, actualizar, rectificar, revocar la autorización y solicitar la eliminación. Indica que la aplicación está dirigida a profesionales de la construcción y personas adultas, y ofrece atención de privacidad de lunes a viernes, de 8:00 a. m. a 5:00 p. m., hora de Colombia.`,
   },
 ];
 
 export type ManualSource = Pick<ManualDocument, "id" | "title" | "url" | "category" | "visibility">;
 
 const stopWords = new Set([
-  "the", "and", "for", "with", "that", "this", "what", "when", "where", "which", "who", "how", "does", "are", "can", "you", "your", "our", "about", "from", "have", "has", "was", "were", "will", "would", "there", "their", "them", "they", "que", "como", "cual", "cuales", "cuando", "donde", "quien", "quienes", "para", "por", "con", "sin", "una", "uno", "los", "las", "del", "de", "la", "el", "en", "es", "son", "tiene", "tienen", "sobre", "nosotros", "usted", "ustedes",
+  "the", "and", "for", "with", "that", "this", "what", "when", "where", "which", "who", "how", "does", "are", "can", "you", "your", "our", "about", "from", "have", "has", "was", "were", "will", "would", "there", "their", "them", "they", "que", "como", "cual", "cuales", "cuando", "donde", "quien", "quienes", "para", "por", "con", "sin", "una", "uno", "los", "las", "del", "de", "la", "el", "en", "es", "son", "tiene", "tienen", "tengo", "sobre", "nosotros", "usted", "ustedes",
 ]);
 
 function normalize(value: string) {

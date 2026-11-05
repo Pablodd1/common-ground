@@ -127,11 +127,12 @@ export const companyResources = mysqlTable(
   "companyResources",
   {
     id: serial("id").primaryKey(),
-    kind: mysqlEnum("kind", ["document", "contact"]).notNull(),
+    kind: mysqlEnum("kind", ["document", "contact", "course", "file"]).notNull(),
     title: varchar("title", { length: 180 }).notNull(),
     category: varchar("category", { length: 80 }).notNull(),
     summary: varchar("summary", { length: 500 }).notNull(),
     body: text("body").notNull(),
+    url: varchar("url", { length: 2048 }),
     phone: varchar("phone", { length: 60 }),
     email: varchar("email", { length: 320 }),
     reportsTo: varchar("reportsTo", { length: 180 }),

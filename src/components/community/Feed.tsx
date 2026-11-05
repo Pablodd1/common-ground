@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
+import { es } from "date-fns/locale";
 import { Heart, MessageCircle, Send, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser, type FeedPost } from "@/providers/trpc";
@@ -10,6 +11,7 @@ import { PersonAvatar } from "./PersonAvatar";
 import { MediaButtons, MediaView, useMediaUpload } from "./Media";
 
 const topics = ["Motivation", "Outside work", "Wins", "Questions"] as const;
+const topicLabels: Record<string, string> = { Motivation: "Motivación", "Outside work": "Fuera del trabajo", Wins: "Logros", Questions: "Preguntas", Celebration: "Celebración" };
 
 export function Feed({ currentUser, initialTopic }: { currentUser: CommunityUser; initialTopic?: string }) {
   const [body, setBody] = useState("");
@@ -23,7 +25,7 @@ export function Feed({ currentUser, initialTopic }: { currentUser: CommunityUser
       setBody("");
       media.setAttachment(null);
       void utils.community.feed.invalidate();
-      toast.success("Shared with your community");
+      toast.success("Publicación compartida con tu comunidad");
     },
     onError: (error) => toast.error(error.message),
   });
@@ -34,45 +36,43 @@ export function Feed({ currentUser, initialTopic }: { currentUser: CommunityUser
 
   const visiblePosts = feed.data?.filter((post) => filter === "For you" || post.topic === filter) ?? [];
 
-  return (
-    <div className="feed-view">
-      <section className="page-intro">
-        <p className="meta-label">YOUR PEOPLE, YOUR SPACE</p>
-        <h1>Good to see you, {currentUser.name?.split(" ")[0] ?? "friend"}.</h1>
-        <p>Share a win, ask a question, or talk about life beyond the to-do list.</p>
-      </section>
+  return <div className="feed-view">
+    <section className="page-intro">
+      <p className="meta-label">TU GENTE, TU ESPACIO</p>
+      <h1>Qué bueno verte, {currentUser.name?.split(" ")[0] ?? "colega"}.</h1>
+      <p>Comparte un logro, haz una pregunta o habla de la vida más allá de las tareas.</p>
+    </section>
 
-      <section className="composer" aria-label="Create a post">
-        <div className="composer-top">
-          <PersonAvatar person={{ ...currentUser, id: currentUser.id, name: currentUser.name ?? "You" }} />
-          <Textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="What’s on your mind?" maxLength={2000} rows={3} />
-        </div>
-        {media.attachment && <div className="composer-preview"><MediaView mediaKey={media.attachment.key} mediaType={media.attachment.contentType} /></div>}
-        <div className="composer-actions">
-          <MediaButtons {...media} />
-          <div className="post-actions">
-            <select value={topic} onChange={(event) => setTopic(event.target.value as (typeof topics)[number])} aria-label="Post topic">
-              {topics.map((item) => <option key={item}>{item}</option>)}
-            </select>
-            <Button onClick={submit} disabled={create.isPending || media.isUploading || (!body.trim() && !media.attachment)}>
-              <Send />{create.isPending ? "Sharing…" : "Share"}
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      <div className="feed-filter" aria-label="Filter posts">
-        {["For you", ...topics, "Celebration"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item}</button>)}
+    <section className="composer" aria-label="Crear una publicación">
+      <div className="composer-top">
+        <PersonAvatar person={{ ...currentUser, id: currentUser.id, name: currentUser.name ?? "Tú" }} />
+        <Textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="¿Qué estás pensando?" maxLength={2000} rows={3} />
       </div>
-
-      <div className="feed-list" aria-live="polite">
-        {feed.isLoading && [1, 2].map((item) => <div className="post-skeleton" key={item} />)}
-        {feed.error && <div className="empty-state"><h2>We lost the thread.</h2><p>{feed.error.message}</p><Button onClick={() => void feed.refetch()}>Try again</Button></div>}
-        {!feed.isLoading && !visiblePosts.length && <div className="empty-state"><Sparkles /><h2>Start the conversation.</h2><p>There are no posts in this space yet. Your first note can change that.</p></div>}
-        {visiblePosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} />)}
+      {media.attachment && <div className="composer-preview"><MediaView mediaKey={media.attachment.key} mediaType={media.attachment.contentType} /></div>}
+      <div className="composer-actions">
+        <MediaButtons {...media} />
+        <div className="post-actions">
+          <select value={topic} onChange={(event) => setTopic(event.target.value as (typeof topics)[number])} aria-label="Tema de la publicación">
+            {topics.map((item) => <option key={item} value={item}>{topicLabels[item]}</option>)}
+          </select>
+          <Button onClick={submit} disabled={create.isPending || media.isUploading || (!body.trim() && !media.attachment)}>
+            <Send />{create.isPending ? "Compartiendo…" : "Compartir"}
+          </Button>
+        </div>
       </div>
+    </section>
+
+    <div className="feed-filter" aria-label="Filtrar publicaciones">
+      {["For you", ...topics, "Celebration"].map((item) => <button key={item} className={filter === item ? "active" : ""} onClick={() => setFilter(item)}>{item === "For you" ? "Para ti" : topicLabels[item]}</button>)}
     </div>
-  );
+
+    <div className="feed-list" aria-live="polite">
+      {feed.isLoading && [1, 2].map((item) => <div className="post-skeleton" key={item} />)}
+      {feed.error && <div className="empty-state"><h2>Perdimos el hilo.</h2><p>{feed.error.message}</p><Button onClick={() => void feed.refetch()}>Intentar de nuevo</Button></div>}
+      {!feed.isLoading && !visiblePosts.length && <div className="empty-state"><Sparkles /><h2>Inicia la conversación.</h2><p>Aún no hay publicaciones en este espacio. Tu primera nota puede cambiar eso.</p></div>}
+      {visiblePosts.map((post) => <PostCard key={post.id} post={post} currentUser={currentUser} />)}
+    </div>
+  </div>;
 }
 
 function PostCard({ post, currentUser }: { post: FeedPost; currentUser: CommunityUser }) {
@@ -85,27 +85,25 @@ function PostCard({ post, currentUser }: { post: FeedPost; currentUser: Communit
     onError: (error) => toast.error(error.message),
   });
 
-  return (
-    <article className="post-card">
-      <header className="post-header">
-        <PersonAvatar person={post.author} />
-        <div><strong>{post.author.name}{post.author.isDemo && <span className="sample-tag">SAMPLE</span>}</strong><p>{post.author.jobTitle || "Colleague"} · {formatDistanceToNow(post.createdAt, { addSuffix: true })}</p></div>
-        <span className="topic-label">{post.topic}</span>
-      </header>
-      {post.body && <p className="post-body">{post.body}</p>}
-      {post.mediaKey && <MediaView mediaKey={post.mediaKey} mediaType={post.mediaType} />}
-      <footer className="post-footer">
-        <button className={post.liked ? "liked" : ""} onClick={() => like.mutate({ postId: post.id })} disabled={like.isPending} aria-label={post.liked ? "Unlike post" : "Like post"}><Heart fill={post.liked ? "currentColor" : "none"} />{post.likeCount || "Like"}</button>
-        <button onClick={() => setShowComments((value) => !value)} aria-expanded={showComments}><MessageCircle />{post.comments.length || "Reply"}</button>
-      </footer>
-      {showComments && <div className="comments">
-        {post.comments.map((item) => <div className="comment" key={item.id}><PersonAvatar person={item.author} size="sm" /><div><strong>{item.author.name}</strong><p>{item.body}</p></div></div>)}
-        <form className="comment-form" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) addComment.mutate({ postId: post.id, body: comment }); }}>
-          <PersonAvatar person={{ ...currentUser, id: currentUser.id, name: currentUser.name ?? "You" }} size="sm" />
-          <Input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Write a thoughtful reply…" maxLength={1000} />
-          <Button size="icon" type="submit" disabled={!comment.trim() || addComment.isPending} aria-label="Send reply"><Send /></Button>
-        </form>
-      </div>}
-    </article>
-  );
+  return <article className="post-card">
+    <header className="post-header">
+      <PersonAvatar person={post.author} />
+      <div><strong>{post.author.name}{post.author.isDemo && <span className="sample-tag">EJEMPLO</span>}</strong><p>{post.author.jobTitle || "Colega"} · {formatDistanceToNow(post.createdAt, { addSuffix: true, locale: es })}</p></div>
+      <span className="topic-label">{topicLabels[post.topic]}</span>
+    </header>
+    {post.body && <p className="post-body">{post.body}</p>}
+    {post.mediaKey && <MediaView mediaKey={post.mediaKey} mediaType={post.mediaType} />}
+    <footer className="post-footer">
+      <button className={post.liked ? "liked" : ""} onClick={() => like.mutate({ postId: post.id })} disabled={like.isPending} aria-label={post.liked ? "Quitar me gusta" : "Me gusta"}><Heart fill={post.liked ? "currentColor" : "none"} />{post.likeCount || "Me gusta"}</button>
+      <button onClick={() => setShowComments((value) => !value)} aria-expanded={showComments}><MessageCircle />{post.comments.length || "Responder"}</button>
+    </footer>
+    {showComments && <div className="comments">
+      {post.comments.map((item) => <div className="comment" key={item.id}><PersonAvatar person={item.author} size="sm" /><div><strong>{item.author.name}</strong><p>{item.body}</p></div></div>)}
+      <form className="comment-form" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) addComment.mutate({ postId: post.id, body: comment }); }}>
+        <PersonAvatar person={{ ...currentUser, id: currentUser.id, name: currentUser.name ?? "Tú" }} size="sm" />
+        <Input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Escribe una respuesta…" maxLength={1000} />
+        <Button size="icon" type="submit" disabled={!comment.trim() || addComment.isPending} aria-label="Enviar respuesta"><Send /></Button>
+      </form>
+    </div>}
+  </article>;
 }

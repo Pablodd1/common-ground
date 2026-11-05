@@ -335,13 +335,14 @@
 .main-assistant { max-width: 1440px; }
 .assistant-view { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; min-width: 0; }
 .assistant-workspace { min-width: 0; }
-.assistant-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 22px; }
+.assistant-header { display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 18px; min-width: 0; margin-bottom: 22px; }
+.assistant-header > div { min-width: 0; max-width: 100%; }
 .eyebrow { display: inline-flex; align-items: center; gap: 7px; color: var(--blue); font-family: "IBM Plex Mono", monospace; font-size: 10px; font-weight: 500; letter-spacing: .13em; line-height: 1.4; }
 .eyebrow svg { font-size: 14px; }
 .assistant-header h1 { margin-top: 7px; font-size: clamp(34px, 7vw, 52px); line-height: 1; letter-spacing: -1.5px; }
 .assistant-header p { margin-top: 10px; color: var(--muted-copy); }
-.assistant-header-actions { display: flex; align-items: center; gap: 8px; }
-.clear-chat, .manual-mobile-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--muted-copy); font-size: 12px; white-space: nowrap; }
+.assistant-header-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; width: 100%; }
+.clear-chat, .manual-mobile-button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--paper); color: var(--muted-copy); font-size: 12px; white-space: nowrap; }
 .clear-chat:hover, .manual-mobile-button:hover { color: var(--ink); background: var(--sage); }
 .assistant-scope { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); color: var(--muted-copy); font-size: 12px; line-height: 1.55; }
 .assistant-scope svg { flex: 0 0 auto; margin-top: 2px; color: var(--blue); font-size: 18px; }
@@ -418,6 +419,11 @@
   .manual-modal { padding: 56px 48px; }
 }
 
+@media (min-width: 768px) {
+  .assistant-header { flex-direction: row; }
+  .assistant-header-actions { flex-wrap: nowrap; width: auto; }
+}
+
 @media (min-width: 1100px) {
   .assistant-view { grid-template-columns: minmax(0, 1fr) 300px; gap: 42px; }
   .manual-library, .manual-library.open { display: block; }
@@ -434,7 +440,10 @@
 .message-sources button:hover { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--sage) 35%, transparent); }
 .add-resource-button { display: inline-flex; align-items: center; gap: 6px; margin-top: 15px; padding: 8px 11px; border: 0; border-radius: 5px; background: var(--blue); color: white; font-size: 12px; }
 .library-view-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 16px; border-bottom: 1px solid var(--line); }
-.library-view-tabs button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted-copy); font-size: 11px; }
+.library-view-tabs.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.library-view-tabs button { display: flex; align-items: center; justify-content: center; gap: 6px; min-width: 0; min-height: 46px; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted-copy); font-size: 11px; }
+.library-view-tabs.three button { gap: 3px; min-height: 48px; padding-inline: 2px; font-size: 12px; white-space: nowrap; }
+.library-view-tabs.three button > svg { width: 14px; height: 14px; flex: 0 0 auto; }
 .library-view-tabs button.active { border-bottom-color: var(--blue); color: var(--blue); }
 .library-view-tabs button span { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 10px; background: var(--sage); color: var(--ink); font-family: "IBM Plex Mono", monospace; font-size: 9px; }
 .manual-document-item { position: relative; border-bottom: 1px solid var(--line); }
@@ -480,6 +489,22 @@
 .resource-save-error { margin-top: 12px; padding: 10px; border-left: 3px solid var(--orange); background: var(--honeydew); font-size: 12px; }
 .resource-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
 .resource-editor-actions button { display: inline-flex; align-items: center; gap: 6px; }
+.learning-directory { display: grid; gap: 14px; min-width: 0; padding-top: 16px; }
+.learning-card { display: grid; grid-template-columns: 26px minmax(0, 1fr); gap: 10px; min-width: 0; padding-bottom: 16px; border-bottom: 1px solid var(--line); }
+.learning-card:last-child { border-bottom: 0; }
+.learning-icon { padding-top: 2px; color: var(--blue); }
+.learning-icon svg { width: 22px; height: 22px; }
+.learning-copy { min-width: 0; }
+.learning-copy > span { display: block; color: var(--blue); font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .06em; line-height: 1.5; text-transform: uppercase; overflow-wrap: anywhere; }
+.learning-copy h3 { margin-top: 4px; font-size: 18px; line-height: 1.25; overflow-wrap: anywhere; }
+.learning-copy p { margin-top: 7px; color: var(--muted-copy); font-size: 12px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
+.learning-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; }
+.learning-actions a, .learning-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 8px 10px; border-radius: 5px; font-size: 12px; text-decoration: none; cursor: pointer; }
+.learning-actions a { border: 1px solid var(--blue); background: var(--blue); color: white; }
+.learning-actions a:hover { background: var(--ink); border-color: var(--ink); }
+.learning-actions button { border: 1px solid var(--line); background: transparent; color: var(--ink); }
+.learning-actions button:hover { border-color: var(--blue); color: var(--blue); }
+.learning-actions svg { width: 14px; height: 14px; }
 
 @media (min-width: 560px) {
   .resource-editor { padding: 42px 38px 28px; }

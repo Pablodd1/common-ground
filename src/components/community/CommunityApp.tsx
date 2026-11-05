@@ -13,11 +13,11 @@ import { CompanyAssistant } from "./CompanyAssistant";
 type Tab = "feed" | "people" | "messages" | "assistant" | "celebrations";
 
 const navItems = [
-  { id: "feed" as const, label: "Community", icon: HomeIcon },
-  { id: "people" as const, label: "People", icon: Users },
-  { id: "messages" as const, label: "Messages", icon: MessageCircle },
-  { id: "assistant" as const, label: "Company", icon: BookOpen },
-  { id: "celebrations" as const, label: "Celebrations", icon: Cake },
+  { id: "feed" as const, label: "Comunidad", icon: HomeIcon },
+  { id: "people" as const, label: "Personas", icon: Users },
+  { id: "messages" as const, label: "Mensajes", icon: MessageCircle },
+  { id: "assistant" as const, label: "Empresa", icon: BookOpen },
+  { id: "celebrations" as const, label: "Celebraciones", icon: Cake },
 ];
 
 export function CommunityApp({ onLogout }: { onLogout: () => void }) {
@@ -36,21 +36,21 @@ export function CommunityApp({ onLogout }: { onLogout: () => void }) {
     openConversation.mutate({ personId: person.id });
   }
 
-  if (me.isLoading) return <div className="app-loading"><Brand /><div className="loading-mark" /><p>Opening your community…</p></div>;
-  if (me.error || !me.data) return <div className="app-loading"><Brand /><h1>We couldn’t open your profile.</h1><p>{me.error?.message}</p><Button onClick={() => void me.refetch()}>Try again</Button></div>;
+  if (me.isLoading) return <div className="app-loading"><Brand /><div className="loading-mark" /><p>Abriendo tu comunidad…</p></div>;
+  if (me.error || !me.data) return <div className="app-loading"><Brand /><h1>No pudimos abrir tu perfil.</h1><p>{me.error?.message}</p><Button onClick={() => void me.refetch()}>Intentar de nuevo</Button></div>;
   const user = me.data;
 
   return <div className="community-shell">
     <aside className="desktop-sidebar">
       <Brand />
-      <nav aria-label="Main navigation">{navItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon /><span>{item.label}</span></button>)}</nav>
+      <nav aria-label="Navegación principal">{navItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon /><span>{item.label}</span></button>)}</nav>
       <div className="sidebar-bottom">
-        <button className="sidebar-profile" onClick={() => setProfileOpen(true)}><PersonAvatar person={{ ...user, name: user.name ?? "You" }} /><span><strong>{user.name}</strong><small>{user.jobTitle || "Complete your profile"}</small></span><Settings2 /></button>
-        <button className="logout-button" onClick={onLogout}><LogOut />Sign out</button>
+        <button className="sidebar-profile" onClick={() => setProfileOpen(true)}><PersonAvatar person={{ ...user, name: user.name ?? "Tú" }} /><span><strong>{user.name}</strong><small>{user.jobTitle || "Completa tu perfil"}</small></span><Settings2 /></button>
+        <button className="logout-button" onClick={onLogout}><LogOut />Cerrar sesión</button>
       </div>
     </aside>
 
-    <header className="mobile-header"><Brand /><button onClick={() => setProfileOpen(true)} aria-label="Edit your profile"><PersonAvatar person={{ ...user, name: user.name ?? "You" }} size="sm" /></button></header>
+    <header className="mobile-header"><Brand /><button onClick={() => setProfileOpen(true)} aria-label="Editar tu perfil"><PersonAvatar person={{ ...user, name: user.name ?? "Tú" }} size="sm" /></button></header>
 
     <main className={`community-main main-${tab}`}>
       {tab === "feed" && <div className="feed-layout"><Feed currentUser={user} /><aside className="right-rail"><CelebrationsRail events={events} currentUser={user} /><CommunityPrinciples /></aside></div>}
@@ -60,7 +60,7 @@ export function CommunityApp({ onLogout }: { onLogout: () => void }) {
       {tab === "celebrations" && <Celebrations events={events} currentUser={user} />}
     </main>
 
-    <nav className="mobile-nav" aria-label="Mobile navigation">{navItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon /><span>{item.label === "Community" ? "Home" : item.label}</span></button>)}</nav>
+    <nav className="mobile-nav" aria-label="Navegación móvil">{navItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon /><span>{item.label === "Comunidad" ? "Inicio" : item.label}</span></button>)}</nav>
     {profileOpen && <ProfileEditor open={profileOpen} onOpenChange={setProfileOpen} user={user} />}
   </div>;
 }
@@ -70,5 +70,5 @@ function Brand() {
 }
 
 function CommunityPrinciples() {
-  return <section className="community-principles"><Compass /><h2>A little more human.</h2><p>No performance scores. No popularity contests. Just a place to be curious about each other.</p><div className="privacy-note"><ShieldCheck /><span><strong>Your conversation, not a dashboard.</strong> Direct messages have no manager view. Service administrators may still access data when required.</span></div></section>;
+  return <section className="community-principles"><Compass /><h2>Un espacio más humano.</h2><p>Sin puntajes de desempeño ni concursos de popularidad. Un lugar para conocernos mejor.</p><div className="privacy-note"><ShieldCheck /><span><strong>Tu conversación, no un tablero de control.</strong> Los mensajes directos no tienen vista para jefes. Los administradores del servicio pueden acceder a los datos cuando sea necesario.</span></div></section>;
 }

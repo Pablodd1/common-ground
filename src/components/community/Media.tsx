@@ -8,17 +8,17 @@ export type Attachment = { key: string; contentType: string; name: string } | nu
 
 export function MediaView({ mediaKey, mediaType, className = "" }: { mediaKey: string; mediaType?: string | null; className?: string }) {
   const { data, isLoading, error } = trpc.community.mediaUrl.useQuery({ key: mediaKey }, { staleTime: 8 * 60 * 1000 });
-  if (isLoading) return <div className={`media-loading ${className}`} aria-label="Loading media" />;
-  if (error || !data?.url) return <p className="media-error">This attachment couldn’t be loaded.</p>;
-  if (mediaType?.startsWith("audio/")) return <audio className={`audio-player ${className}`} src={data.url} controls preload="metadata" />;
-  return <img className={`shared-image ${className}`} src={data.url} alt="Shared by a colleague" loading="lazy" />;
+  if (isLoading) return <div className={`media-loading ${className}`} aria-label="Cargando contenido multimedia" />;
+  if (error || !data?.url) return <p className="media-error">No pudimos cargar este archivo adjunto.</p>;
+  if (mediaType?.startsWith("audio/")) return <audio className={`audio-player ${className}`} src={data.url} controls preload="metadata" aria-label="Nota de voz" />;
+  return <img className={`shared-image ${className}`} src={data.url} alt="Foto compartida por un compañero" loading="lazy" />;
 }
 
 async function toBase64(file: Blob) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = () => reject(new Error("Could not read this file."));
+    reader.onerror = () => reject(new Error("No pudimos leer este archivo."));
     reader.readAsDataURL(file);
   });
 }
@@ -26,20 +26,20 @@ async function toBase64(file: Blob) {
 export function useMediaUpload() {
   const [attachment, setAttachment] = useState<Attachment>(null);
   const upload = trpc.community.upload.useMutation({
-    onError: (error) => toast.error(error.message || "Upload failed. Try a smaller file."),
+    onError: (error) => toast.error(error.message || "No pudimos subir el archivo. Intenta con uno más pequeño."),
   });
 
   async function uploadFile(file: Blob, name: string, contentType: string) {
     if (file.size > 12_000_000) {
-      toast.error("Please choose a file smaller than 12 MB.");
+      toast.error("Elige un archivo de menos de 12 MB.");
       return;
     }
     try {
       const saved = await upload.mutateAsync({ name, contentBase64: await toBase64(file), contentType });
       setAttachment({ ...saved, name });
-      toast.success("Attachment ready to share");
+      toast.success("Archivo listo para compartir");
     } catch {
-      // The mutation surfaces a specific, user-readable error.
+      // La mutación muestra un error específico y comprensible para la persona.
     }
   }
 
@@ -68,7 +68,7 @@ export function MediaButtons({
       return;
     }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      toast.error("Voice recording is not supported in this browser.");
+      toast.error("Este navegador no permite grabar notas de voz.");
       return;
     }
     try {
@@ -83,7 +83,7 @@ export function MediaButtons({
         if (timer.current) clearInterval(timer.current);
         setRecording(false);
         const blob = new Blob(chunks.current, { type: mimeType });
-        if (blob.size) void uploadFile(blob, `voice-note.${mimeType === "audio/webm" ? "webm" : "m4a"}`, mimeType);
+        if (blob.size) void uploadFile(blob, `nota-de-voz.${mimeType === "audio/webm" ? "webm" : "m4a"}`, mimeType);
         setSeconds(0);
       };
       mediaRecorder.start();
@@ -91,7 +91,7 @@ export function MediaButtons({
       setSeconds(0);
       timer.current = setInterval(() => setSeconds((value) => value + 1), 1000);
     } catch {
-      toast.error("Microphone access is needed to record a voice note.");
+      toast.error("Necesitamos acceso al micrófono para grabar una nota de voz.");
     }
   }
 
@@ -103,17 +103,17 @@ export function MediaButtons({
     <div className="media-controls">
       <input ref={imageInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={(e) => chooseImage(e.target.files?.[0])} />
       <input ref={cameraInput} className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={(e) => chooseImage(e.target.files?.[0])} />
-      <Button type="button" variant="ghost" size={compact ? "icon" : "sm"} onClick={() => imageInput.current?.click()} disabled={isUploading || recording} aria-label="Add a photo">
-        <ImagePlus />{!compact && "Photo"}
+      <Button type="button" variant="ghost" size={compact ? "icon" : "sm"} onClick={() => imageInput.current?.click()} disabled={isUploading || recording} aria-label="Agregar una foto">
+        <ImagePlus />{!compact && "Foto"}
       </Button>
-      <Button type="button" variant="ghost" size={compact ? "icon" : "sm"} onClick={() => cameraInput.current?.click()} disabled={isUploading || recording} aria-label="Use camera">
-        <Camera />{!compact && "Camera"}
+      <Button type="button" variant="ghost" size={compact ? "icon" : "sm"} onClick={() => cameraInput.current?.click()} disabled={isUploading || recording} aria-label="Usar la cámara">
+        <Camera />{!compact && "Cámara"}
       </Button>
-      {voice && <Button type="button" variant="ghost" size={compact ? "icon" : "sm"} className={recording ? "recording" : ""} onClick={() => void toggleRecording()} disabled={isUploading} aria-label={recording ? "Stop recording" : "Record a voice note"}>
-        {recording ? <Square /> : <Mic />}{!compact && (recording ? `Stop ${seconds}s` : "Voice")}
+      {voice && <Button type="button" variant="ghost" size={compact ? "icon" : "sm"} className={recording ? "recording" : ""} onClick={() => void toggleRecording()} disabled={isUploading} aria-label={recording ? "Detener la grabación" : "Grabar una nota de voz"}>
+        {recording ? <Square /> : <Mic />}{!compact && (recording ? `Detener ${seconds} s` : "Voz")}
       </Button>}
-      {isUploading && <span className="upload-status"><Paperclip /> Uploading…</span>}
-      {attachment && <span className="attachment-chip"><span>{attachment.name}</span><button type="button" onClick={() => setAttachment(null)} aria-label="Remove attachment"><Trash2 /></button></span>}
+      {isUploading && <span className="upload-status"><Paperclip /> Subiendo…</span>}
+      {attachment && <span className="attachment-chip"><span>{attachment.name}</span><button type="button" onClick={() => setAttachment(null)} aria-label="Quitar archivo adjunto"><Trash2 /></button></span>}
     </div>
   );
 }
