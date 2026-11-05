@@ -3,12 +3,20 @@ export type ManualCategory = "Company" | "Products" | "Buying & logistics" | "Po
 export interface ManualDocument {
   id: string;
   title: string;
-  category: ManualCategory;
+  category: string;
   summary: string;
-  url: string;
+  url: string | null;
   retrievedAt: string;
   keywords: string;
   content: string;
+  body?: string;
+  visibility?: "public" | "private";
+  kind?: "document" | "contact";
+  resourceId?: number;
+  isPublished?: boolean;
+  phone?: string | null;
+  email?: string | null;
+  reportsTo?: string | null;
 }
 
 const retrievedAt = "2026-11-05";
@@ -182,7 +190,7 @@ The page also describes rights to know, update, rectify, revoke authorization an
   },
 ];
 
-export type ManualSource = Pick<ManualDocument, "id" | "title" | "url" | "category">;
+export type ManualSource = Pick<ManualDocument, "id" | "title" | "url" | "category" | "visibility">;
 
 const stopWords = new Set([
   "the", "and", "for", "with", "that", "this", "what", "when", "where", "which", "who", "how", "does", "are", "can", "you", "your", "our", "about", "from", "have", "has", "was", "were", "will", "would", "there", "their", "them", "they", "que", "como", "cual", "cuales", "cuando", "donde", "quien", "quienes", "para", "por", "con", "sin", "una", "uno", "los", "las", "del", "de", "la", "el", "en", "es", "son", "tiene", "tienen", "sobre", "nosotros", "usted", "ustedes",
@@ -192,12 +200,12 @@ function normalize(value: string) {
   return value.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9+]+/g, " ").trim();
 }
 
-export function retrieveManualSources(question: string, limit = 3): ManualDocument[] {
+export function retrieveManualSources(question: string, limit = 3, additionalDocuments: ManualDocument[] = []): ManualDocument[] {
   const normalized = normalize(question);
   const tokens = [...new Set(normalized.split(" ").filter((token) => token.length > 2 && !stopWords.has(token)))];
   if (!tokens.length) return [];
 
-  return companyManual
+  return [...companyManual, ...additionalDocuments]
     .map((document) => {
       const title = normalize(document.title);
       const summary = normalize(document.summary);
@@ -224,5 +232,5 @@ export function retrieveManualSources(question: string, limit = 3): ManualDocume
 }
 
 export function toManualSource(document: ManualDocument): ManualSource {
-  return { id: document.id, title: document.title, url: document.url, category: document.category };
+  return { id: document.id, title: document.title, url: document.url, category: document.category, visibility: document.visibility ?? "public" };
 }

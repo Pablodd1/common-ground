@@ -123,6 +123,26 @@ export const assistantMessages = mysqlTable(
   (table) => [index("assistant_user_idx").on(table.userId, table.createdAt)],
 );
 
+export const companyResources = mysqlTable(
+  "companyResources",
+  {
+    id: serial("id").primaryKey(),
+    kind: mysqlEnum("kind", ["document", "contact"]).notNull(),
+    title: varchar("title", { length: 180 }).notNull(),
+    category: varchar("category", { length: 80 }).notNull(),
+    summary: varchar("summary", { length: 500 }).notNull(),
+    body: text("body").notNull(),
+    phone: varchar("phone", { length: 60 }),
+    email: varchar("email", { length: 320 }),
+    reportsTo: varchar("reportsTo", { length: 180 }),
+    isPublished: boolean("isPublished").default(true).notNull(),
+    createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().notNull().$onUpdate(() => new Date()),
+  },
+  (table) => [index("company_resources_idx").on(table.kind, table.isPublished)],
+);
+
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Post = typeof posts.$inferSelect;

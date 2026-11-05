@@ -56,7 +56,7 @@ export function CommunityApp({ onLogout }: { onLogout: () => void }) {
       {tab === "feed" && <div className="feed-layout"><Feed currentUser={user} /><aside className="right-rail"><CelebrationsRail events={events} currentUser={user} /><CommunityPrinciples /></aside></div>}
       {tab === "people" && <People currentUser={user} onMessage={messagePerson} />}
       {tab === "messages" && <Messages currentUser={user} activeConversation={activeConversation} setActiveConversation={setActiveConversation} onFindPeople={() => setTab("people")} />}
-      {tab === "assistant" && <CompanyAssistant />}
+      {tab === "assistant" && <CompanyAssistant isAdmin={user.role === "admin"} />}
       {tab === "celebrations" && <Celebrations events={events} currentUser={user} />}
     </main>
 

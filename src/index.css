@@ -428,3 +428,61 @@
 @media (min-width: 1340px) {
   .assistant-view { grid-template-columns: minmax(0, 1fr) 340px; gap: 58px; }
 }
+
+/* Internal HR resources and reporting directory */
+.message-sources button { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 8px 10px; border: 0; border-left: 2px solid var(--sage); background: transparent; color: var(--muted-copy); font-size: 12px; text-align: left; }
+.message-sources button:hover { border-color: var(--blue); color: var(--blue); background: color-mix(in srgb, var(--sage) 35%, transparent); }
+.add-resource-button { display: inline-flex; align-items: center; gap: 6px; margin-top: 15px; padding: 8px 11px; border: 0; border-radius: 5px; background: var(--blue); color: white; font-size: 12px; }
+.library-view-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-top: 16px; border-bottom: 1px solid var(--line); }
+.library-view-tabs button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 46px; padding: 8px 4px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted-copy); font-size: 11px; }
+.library-view-tabs button.active { border-bottom-color: var(--blue); color: var(--blue); }
+.library-view-tabs button span { display: grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 10px; background: var(--sage); color: var(--ink); font-family: "IBM Plex Mono", monospace; font-size: 9px; }
+.manual-document-item { position: relative; border-bottom: 1px solid var(--line); }
+.manual-document-open { display: block; width: 100%; padding: 16px 28px 16px 2px; border: 0; background: transparent; color: var(--ink); text-align: left; }
+.manual-document-open > span:first-child { color: var(--blue); font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.manual-document-open strong { display: block; margin-top: 4px; font-size: 16px; line-height: 1.3; }
+.manual-document-open p { margin-top: 5px; color: var(--muted-copy); font-size: 12px; line-height: 1.5; }
+.manual-document-open:hover strong { color: var(--blue); }
+.edit-resource { display: grid; place-items: center; width: 30px; height: 30px; border: 0; border-radius: 50%; background: transparent; color: var(--muted-copy); }
+.manual-document-item > .edit-resource { position: absolute; top: 14px; right: 0; }
+.edit-resource:hover { background: var(--sage); color: var(--blue); }
+.contact-directory { padding-top: 8px; }
+.contact-card { padding: 18px 0; border-bottom: 1px solid var(--line); }
+.contact-card-top { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 10px; }
+.contact-initial { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: var(--blue); color: white; font-size: 17px; }
+.contact-card-top > div > span { color: var(--blue); font-family: "IBM Plex Mono", monospace; font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+.contact-card h3 { font-size: 19px; line-height: 1.2; }
+.contact-card-top p { margin-top: 2px; color: var(--muted-copy); font-size: 12px; }
+.contact-responsibilities { margin: 13px 0; color: var(--muted-copy); font-size: 13px; line-height: 1.55; white-space: pre-wrap; }
+.reporting-line { display: grid; gap: 2px; padding: 10px; border-left: 2px solid var(--orange); background: var(--paper); font-size: 11px; }
+.reporting-line strong { color: var(--muted-copy); font-family: "IBM Plex Mono", monospace; font-size: 9px; text-transform: uppercase; }
+.contact-actions { display: grid; gap: 6px; margin-top: 12px; }
+.contact-actions a { display: flex; align-items: center; gap: 7px; color: var(--blue); font-size: 12px; text-decoration: none; overflow-wrap: anywhere; }
+.contact-empty { padding: 28px 4px; color: var(--muted-copy); }
+.contact-empty > svg { color: var(--blue); font-size: 28px; }
+.contact-empty h3 { margin-top: 12px; color: var(--ink); font-size: 20px; line-height: 1.25; }
+.contact-empty p { margin-top: 8px; font-size: 13px; }
+.contact-empty button { display: inline-flex; align-items: center; gap: 5px; margin-top: 16px; padding: 8px 10px; border: 0; border-radius: 5px; background: var(--blue); color: white; font-size: 12px; }
+.internal-source-stamp { display: flex; align-items: center; gap: 8px; padding: 12px 14px; background: var(--sage); color: var(--ink); font-size: 12px; }
+.resource-modal-actions { display: flex; gap: 8px; margin-top: 24px; }
+.resource-editor-backdrop { align-items: center; justify-content: center; padding: 20px; }
+.resource-editor { position: relative; width: min(760px, 100%); max-height: 92dvh; padding: 38px 24px 24px; overflow-y: auto; background: var(--paper); box-shadow: 0 20px 60px rgb(30 40 30 / .2); }
+.resource-editor h2 { margin-top: 10px; font-size: 34px; letter-spacing: -.8px; }
+.resource-editor > p { margin-top: 7px; color: var(--muted-copy); font-size: 13px; }
+.resource-form-grid { display: grid; gap: 13px; margin-top: 22px; }
+.resource-form-grid label { display: grid; gap: 5px; color: var(--ink); font-size: 12px; }
+.resource-form-grid input, .resource-form-grid select, .resource-form-grid textarea { width: 100%; padding: 10px 11px; border: 1px solid var(--line); border-radius: 5px; background: var(--honeydew); color: var(--ink); }
+.resource-form-grid textarea { resize: vertical; line-height: 1.55; }
+.publish-resource { display: flex; align-items: flex-start; gap: 10px; margin-top: 18px; padding: 13px; background: var(--sage); cursor: pointer; }
+.publish-resource input { width: 18px; height: 18px; margin-top: 2px; accent-color: var(--blue); }
+.publish-resource strong, .publish-resource small { display: block; }
+.publish-resource small { color: var(--muted-copy); }
+.resource-save-error { margin-top: 12px; padding: 10px; border-left: 3px solid var(--orange); background: var(--honeydew); font-size: 12px; }
+.resource-editor-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 20px; }
+.resource-editor-actions button { display: inline-flex; align-items: center; gap: 6px; }
+
+@media (min-width: 560px) {
+  .resource-editor { padding: 42px 38px 28px; }
+  .resource-form-grid { grid-template-columns: 1fr 1fr; }
+  .resource-form-grid label.full { grid-column: 1 / -1; }
+}
