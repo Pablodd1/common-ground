@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { users } from "@db/schema";
 import type { User } from "@db/schema";
 import { getDb } from "./connection";
@@ -54,7 +54,9 @@ export async function upsertUserByAuthId(data: {
       target: users.authId,
       set: {
         email: data.email,
-        name: data.name,
+        // Keep a name the user has set in their profile; the sign-in fallback
+        // (email prefix) must not overwrite it on every login.
+        name: sql`case when ${users.name} is null then ${data.name} else ${users.name} end`,
         lastSignInAt: new Date(),
         // Promote the owner on login, never demote an existing admin.
         ...(isOwner ? { role: "admin" as const } : {}),
