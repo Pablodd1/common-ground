@@ -61,7 +61,7 @@ function friendlyAiError(error: unknown): TRPCError {
   if (classified instanceof AiUnavailable) {
     return new TRPCError({
       code: "PRECONDITION_FAILED",
-      message: "El asistente de la empresa no está disponible porque el cupo de IA del sitio está agotado. Un administrador debe agregar cupo en Kimi.",
+      message: "El asistente de la empresa no está disponible temporalmente por el cupo del proveedor de IA. Contacta al administrador.",
       cause: classified,
     });
   }
@@ -124,18 +124,17 @@ export const assistantRouter = createRouter({
 
         try {
           const { defaultModelId } = await listModels();
-          const kimiGw = createOpenAICompatible({
-            name: "kimi-gw",
-            baseURL: process.env.KIMI_AGENTGW_BASE_URL!,
-            apiKey: process.env.KIMI_AGENTGW_API_KEY!,
+          const deepseek = createOpenAICompatible({
+            name: "deepseek",
+            baseURL: process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/v1",
+            apiKey: process.env.DEEPSEEK_API_KEY!,
             includeUsage: true,
-            supportsStructuredOutputs: true,
           });
           const result = await generateText({
-            model: kimiGw(defaultModelId),
+            model: deepseek(defaultModelId),
             system: `Eres el asistente del manual de empresa para los colaboradores de UNITEC USA Design. Responde siempre en español de Colombia, con un tono claro, cercano y respetuoso, sin importar el idioma de la pregunta. Usa ÚNICAMENTE las fuentes públicas del sitio web y los recursos internos publicados por administradores que se suministran aquí. Nunca uses conocimiento externo ni inventes datos del personal, número de empleados, políticas internas, precios, existencias, promociones, fechas, garantías, capacidades o compromisos. No deduzcas servicios o usos no escritos a partir de un canal de contacto o una ubicación. Si las fuentes no responden la pregunta, dilo claramente y sugiere consultar al equipo interno correspondiente. Sé conciso, cálido y práctico, normalmente en menos de 220 palabras. Usa párrafos cortos de texto sencillo o listas simples con guiones. No uses marcadores de Markdown como **, ## ni enlaces en negrita. No afirmes ser humano, abogado ni una aprobación oficial. Distingue los términos públicos del sitio web de las políticas internas de RR. HH. Si la pregunta trata sobre la política de privacidad de otro producto, deja claro ese alcance. No incluyas enlaces en la respuesta; la interfaz muestra por separado los enlaces exactos de las fuentes.`,
             prompt: `${context ? `CONVERSACIÓN RECIENTE (solo contexto; nunca es una fuente factual):\n${context}\n\n` : ""}ÚLTIMA PREGUNTA DEL COLABORADOR:\n${input.question}\n\nFUENTES PÚBLICAS E INTERNAS DE LA EMPRESA:\n${sourceText}`,
-            providerOptions: { "kimi-gw": { max_completion_tokens: 1000 } },
+            providerOptions: { deepseek: { max_tokens: 900 } },
           });
           answer = result.text.trim();
           if (!answer) throw new Error("El modelo devolvió una respuesta vacía.");
@@ -147,7 +146,7 @@ export const assistantRouter = createRouter({
       const db = getDb();
       const saved = await db.transaction(async (tx) => {
         await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "user", body: input.question, sources: [] });
-        const [{ id }] = await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "assistant", body: answer, sources }).$returningId();
+        const [{ id }] = await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "assistant", body: answer, sources }).returning({ id: assistantMessages.id });
         return id;
       });
       return { id: saved, answer, sources };
@@ -188,7 +187,7 @@ export const assistantRouter = createRouter({
         await getDb().update(companyResources).set(values).where(eq(companyResources.id, input.id));
         return { id: input.id };
       }
-      const [{ id }] = await getDb().insert(companyResources).values(values).$returningId();
+      const [{ id }] = await getDb().insert(companyResources).values(values).returning({ id: companyResources.id });
       return { id };
     }),
 

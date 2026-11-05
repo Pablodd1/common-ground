@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,15 @@ import { PersonAvatar } from "./PersonAvatar";
 import { MediaButtons, useMediaUpload } from "./Media";
 
 export function ProfileEditor({ open, onOpenChange, user }: { open: boolean; onOpenChange: (open: boolean) => void; user: CommunityUser }) {
-  const [form, setForm] = useState({ name: "", jobTitle: "", department: "", location: "", bio: "", interests: "", birthday: "", startDate: "", shareBirthday: true, shareLocation: true });
+  // Seeded at mount: CommunityApp only mounts this editor while it is open, so
+  // the initializer already runs with the freshest profile on every open — no
+  // effect-driven setState (and its cascading re-render) needed.
+  const [form, setForm] = useState({
+    name: user.name ?? "", jobTitle: user.jobTitle ?? "", department: user.department ?? "",
+    location: user.location ?? "", bio: user.bio ?? "", interests: user.interestsList.join(", "),
+    birthday: user.birthday ?? "", startDate: user.startDate ?? "",
+    shareBirthday: user.shareBirthday, shareLocation: user.shareLocation,
+  });
   const media = useMediaUpload();
   const utils = trpc.useUtils();
   const update = trpc.community.updateProfile.useMutation({
@@ -21,18 +29,6 @@ export function ProfileEditor({ open, onOpenChange, user }: { open: boolean; onO
     },
     onError: (error) => toast.error(error.message),
   });
-
-  useEffect(() => {
-    if (open) {
-      setForm({
-        name: user.name ?? "", jobTitle: user.jobTitle ?? "", department: user.department ?? "",
-        location: user.location ?? "", bio: user.bio ?? "", interests: user.interestsList.join(", "),
-        birthday: user.birthday ?? "", startDate: user.startDate ?? "",
-        shareBirthday: user.shareBirthday, shareLocation: user.shareLocation,
-      });
-      media.setAttachment(null);
-    }
-  }, [open]); // Restablece el formulario solo cuando se abre el editor.
 
   const set = (key: keyof typeof form, value: string | boolean) => setForm((current) => ({ ...current, [key]: value }));
   const avatarPerson = { ...user, name: form.name || user.name || "Tú", avatarKey: media.attachment?.key ?? user.avatarKey };

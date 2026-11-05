@@ -9,11 +9,23 @@ function required(name: string): string {
 }
 
 export const env = {
-  appId: required("APP_ID"),
   appSecret: required("APP_SECRET"),
   isProduction: process.env.NODE_ENV === "production",
+  // Postgres (Supabase). Runtime should use the transaction pooler (6543),
+  // which requires prepared statements to be disabled — see queries/connection.
   databaseUrl: required("DATABASE_URL"),
-  kimiAuthUrl: required("KIMI_AUTH_URL"),
-  kimiOpenUrl: required("KIMI_OPEN_URL"),
-  ownerUnionId: process.env.OWNER_UNION_ID ?? "",
+  supabaseUrl: required("VITE_SUPABASE_URL").replace(/\/+$/, ""),
+  supabaseServiceKey: required("SUPABASE_SECRET_KEY"),
+  storageBucket: process.env.SUPABASE_STORAGE_BUCKET ?? "media",
+  allowedEmailDomains: (process.env.ALLOWED_EMAIL_DOMAINS ?? "")
+    .split(",")
+    .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
+    .filter(Boolean),
+  ownerEmail: (process.env.OWNER_EMAIL ?? "").trim().toLowerCase(),
+  // OpenAI-compatible gateway (DeepSeek by default).
+  deepseekApiKey: required("DEEPSEEK_API_KEY"),
+  deepseekBaseUrl: (
+    process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/v1"
+  ).replace(/\/+$/, ""),
+  deepseekModel: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
 };

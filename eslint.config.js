@@ -20,4 +20,18 @@ export default defineConfig([
       globals: globals.browser,
     },
   },
+  {
+    // shadcn/ui primitives and shared hook+component modules: these files
+    // intentionally export variants/hooks next to components; the fast-refresh
+    // boundary warning is noise for them, not an actionable defect.
+    files: [
+      'src/components/ui/**',
+      'src/components/community/Media.tsx',
+      'src/components/community/Celebrations.tsx',
+      'src/providers/trpc.tsx',
+    ],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])

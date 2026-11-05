@@ -1,36 +1,65 @@
 import { eq } from "drizzle-orm";
-import * as schema from "@db/schema";
-import type { InsertUser } from "@db/schema";
+import { users } from "@db/schema";
+import type { User } from "@db/schema";
 import { getDb } from "./connection";
 import { env } from "../lib/env";
 
-export async function findUserByUnionId(unionId: string) {
+export async function findUserByAuthId(authId: string): Promise<User | undefined> {
   const rows = await getDb()
     .select()
-    .from(schema.users)
-    .where(eq(schema.users.unionId, unionId))
+    .from(users)
+    .where(eq(users.authId, authId))
     .limit(1);
   return rows.at(0);
 }
 
-export async function upsertUser(data: InsertUser) {
-  const values = { ...data };
-  const updateSet: Partial<InsertUser> = {
-    lastSignInAt: new Date(),
-    ...data,
-  };
+export async function upsertUserByAuthId(data: {
+  authId: string;
+  email: string;
+  name: string;
+}): Promise<User> {
+  const db = getDb();
+  const isOwner = data.email.toLowerCase() === env.ownerEmail;
 
-  if (
-    values.role === undefined &&
-    values.unionId &&
-    values.unionId === env.ownerUnionId
-  ) {
-    values.role = "admin";
-    updateSet.role = "admin";
+  // Reconcile by e-mail first: if the Supabase account was deleted and
+  // recreated (same address, new auth id), re-point the existing row instead of
+  // tripping the e-mail uniqueness on insert.
+  const byEmail = await db.query.users.findFirst({
+    where: eq(users.email, data.email),
+  });
+  if (byEmail && byEmail.authId !== data.authId) {
+    const [updated] = await db
+      .update(users)
+      .set({
+        authId: data.authId,
+        email: data.email,
+        name: data.name,
+        lastSignInAt: new Date(),
+        ...(isOwner && byEmail.role !== "admin" ? { role: "admin" as const } : {}),
+      })
+      .where(eq(users.id, byEmail.id))
+      .returning();
+    return updated;
   }
 
-  await getDb()
-    .insert(schema.users)
-    .values(values)
-    .onDuplicateKeyUpdate({ set: updateSet });
+  const [saved] = await db
+    .insert(users)
+    .values({
+      authId: data.authId,
+      email: data.email,
+      name: data.name,
+      ...(isOwner ? { role: "admin" as const } : {}),
+    })
+    .onConflictDoUpdate({
+      target: users.authId,
+      set: {
+        email: data.email,
+        name: data.name,
+        lastSignInAt: new Date(),
+        // Promote the owner on login, never demote an existing admin.
+        ...(isOwner ? { role: "admin" as const } : {}),
+      },
+    })
+    .returning();
+  return saved;
 }

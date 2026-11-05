@@ -20,36 +20,74 @@ const supportedContentTypes = [
 ] as const;
 type SupportedContentType = typeof supportedContentTypes[number];
 
+// Mirrors the server cap in media-upload.ts (Vercel request-body ceiling).
+const MAX_UPLOAD_BYTES = 4_000_000;
+
 function isSupportedContentType(value: string): value is SupportedContentType {
   return supportedContentTypes.includes(value as SupportedContentType);
+}
+
+// Photos from phone cameras routinely exceed the demo's 4 MB proxy cap, so
+// images are downscaled on-canvas before uploading; audio passes through
+// untouched (voice notes stay well under the cap at recorder bitrates).
+async function downscaleImage(file: Blob): Promise<{ blob: Blob; type: string }> {
+  if (file.type === "image/gif" || file.size <= MAX_UPLOAD_BYTES) {
+    return { blob: file, type: file.type };
+  }
+  try {
+    const bitmap = await createImageBitmap(file);
+    const maxEdge = 2200;
+    const scale = Math.min(1, maxEdge / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.round(bitmap.width * scale);
+    canvas.height = Math.round(bitmap.height * scale);
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { blob: file, type: file.type };
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.85),
+    );
+    if (!blob || !blob.size) return { blob: file, type: file.type };
+    return { blob, type: "image/jpeg" };
+  } catch {
+    return { blob: file, type: file.type };
+  }
 }
 
 export function useMediaUpload() {
   const [attachment, setAttachment] = useState<Attachment>(null);
   const [isUploading, setIsUploading] = useState(false);
-  const createUploadUrl = trpc.community.createUploadUrl.useMutation();
-  const completeUpload = trpc.community.completeUpload.useMutation();
 
   async function uploadFile(file: Blob, name: string, contentType: string) {
-    if (!file.size || file.size > 12_000_000) {
-      toast.error("Elige un archivo de entre 1 byte y 12 MB.");
-      return;
-    }
-    if (!isSupportedContentType(contentType)) {
+    if (!file.size || !isSupportedContentType(contentType)) {
       toast.error("Este tipo de archivo no está permitido. Usa una imagen o una nota de voz compatible.");
       return;
     }
     setIsUploading(true);
     try {
-      const target = await createUploadUrl.mutateAsync({ name, contentType, size: file.size });
-      const response = await fetch(target.uploadUrl, {
-        method: "PUT",
-        headers: { "content-type": contentType },
-        body: file,
+      const prepared = contentType.startsWith("image/")
+        ? await downscaleImage(file)
+        : { blob: file, type: contentType };
+      if (!prepared.blob.size || prepared.blob.size > MAX_UPLOAD_BYTES) {
+        toast.error("El archivo supera el límite de 4 MB del demo. Prueba con uno más pequeño.");
+        return;
+      }
+      const response = await fetch("/api/media", {
+        method: "POST",
+        credentials: "include",
+        headers: {
+          "content-type": "application/octet-stream",
+          "x-media-type": prepared.type,
+          "x-media-name": encodeURIComponent(name).slice(0, 400),
+          "x-media-size": String(prepared.blob.size),
+        },
+        body: prepared.blob,
       });
-      if (!response.ok) throw new Error("Vercel Blob rechazó el archivo.");
-      const saved = await completeUpload.mutateAsync({ key: target.key, name, contentType, size: file.size });
-      setAttachment({ ...saved, name });
+      const payload = await response.json().catch(() => null) as { key?: string; contentType?: string; error?: string } | null;
+      if (!response.ok || !payload?.key) {
+        throw new Error(payload?.error || "No pudimos subir el archivo.");
+      }
+      setAttachment({ key: payload.key, contentType: payload.contentType ?? prepared.type, name });
       toast.success("Archivo listo para compartir");
     } catch (error) {
       const message = error instanceof Error ? error.message : "No pudimos subir el archivo.";

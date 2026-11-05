@@ -1,17 +1,15 @@
-import { and, asc, count, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { comments, conversations, files, likes, messages, posts, users } from "@db/schema";
 import { authedQuery, createRouter } from "./middleware";
 import { getDb } from "./queries/connection";
-import { head, issueSignedToken, presignUrl } from "@vercel/blob";
+import { signReadUrl } from "./lib/storage";
+import { log } from "./lib/logger";
 
 const topicSchema = z.enum(["Motivation", "Outside work", "Wins", "Questions", "Celebration"]);
-const uploadContentType = z.enum([
-  "image/jpeg", "image/png", "image/webp", "image/gif",
-  "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav",
-]);
-const MAX_MEDIA_BYTES = 12_000_000;
+// Uploads themselves go through POST /api/media (see server/media-upload.ts);
+// these fields only reference an already-registered file on posts and messages.
 const mediaInput = z.object({
   mediaKey: z.string().max(512).optional(),
   mediaType: z.string().max(120).optional(),
@@ -111,23 +109,30 @@ export const communityRouter = createRouter({
     const commentAuthors = commentAuthorIds.length
       ? await db.select().from(users).where(inArray(users.id, commentAuthorIds))
       : [];
+    // One round-trip for every post's likes (and the viewer's own) instead of
+    // two queries per post — the feed made up to 100 sequential-ish calls.
+    const likeRows = await db
+      .select({ postId: likes.postId, userId: likes.userId })
+      .from(likes)
+      .where(inArray(likes.postId, postIds));
+    const likeStats = new Map<number, { likeCount: number; liked: boolean }>();
+    for (const row of likeRows) {
+      const stat = likeStats.get(row.postId) ?? { likeCount: 0, liked: false };
+      stat.likeCount += 1;
+      if (row.userId === ctx.user.id) stat.liked = true;
+      likeStats.set(row.postId, stat);
+    }
     const allPeople = [...authors, ...commentAuthors];
     const peopleMap = new Map(allPeople.map((person) => [person.id, publicPerson(person)]));
 
-    return Promise.all(rows.map(async (post) => {
-      const [likeCount] = await db.select({ value: count() }).from(likes).where(eq(likes.postId, post.id));
-      const likedRows = await db.select({ userId: likes.userId }).from(likes)
-        .where(and(eq(likes.postId, post.id), eq(likes.userId, ctx.user.id))).limit(1);
-      return {
-        ...post,
-        author: peopleMap.get(post.authorId)!,
-        likeCount: likeCount?.value ?? 0,
-        liked: likedRows.length > 0,
-        comments: commentRows.filter((comment) => comment.postId === post.id).map((comment) => ({
-          ...comment,
-          author: peopleMap.get(comment.authorId)!,
-        })),
-      };
+    return rows.map((post) => ({
+      ...post,
+      author: peopleMap.get(post.authorId)!,
+      ...(likeStats.get(post.id) ?? { likeCount: 0, liked: false }),
+      comments: commentRows.filter((comment) => comment.postId === post.id).map((comment) => ({
+        ...comment,
+        author: peopleMap.get(comment.authorId)!,
+      })),
     }));
   }),
 
@@ -145,7 +150,7 @@ export const communityRouter = createRouter({
         topic: input.topic,
         mediaKey: input.mediaKey,
         mediaType: input.mediaType,
-      }).$returningId();
+      }).returning({ id: posts.id });
       return created;
     }),
 
@@ -214,7 +219,7 @@ export const communityRouter = createRouter({
         where: and(eq(conversations.userOneId, userOneId), eq(conversations.userTwoId, userTwoId)),
       });
       if (!conversation) {
-        const [created] = await db.insert(conversations).values({ userOneId, userTwoId }).$returningId();
+        const [created] = await db.insert(conversations).values({ userOneId, userTwoId }).returning({ id: conversations.id });
         conversation = await db.query.conversations.findFirst({ where: eq(conversations.id, created.id) });
       }
       return { id: conversation!.id };
@@ -248,78 +253,19 @@ export const communityRouter = createRouter({
       return { ok: true };
     }),
 
-  createUploadUrl: authedQuery.input(z.object({
-    name: z.string().trim().min(1).max(180),
-    contentType: uploadContentType,
-    size: z.number().int().min(1).max(MAX_MEDIA_BYTES),
-  })).mutation(async ({ ctx, input }) => {
-    const safeName = input.name
-      .replace(/[\\/\u0000-\u001f]/g, "-")
-      .replace(/\.\./g, "-")
-      .slice(-140);
-    const key = `u/${ctx.user.id}/${Date.now()}-${safeName}`;
-    const validUntil = Date.now() + 10 * 60 * 1000;
-    const signedToken = await issueSignedToken({
-      pathname: key,
-      operations: ["put"],
-      allowedContentTypes: [input.contentType],
-      maximumSizeInBytes: MAX_MEDIA_BYTES,
-      validUntil,
-    });
-    const { presignedUrl } = await presignUrl(signedToken, {
-      operation: "put",
-      pathname: key,
-      access: "private",
-      allowedContentTypes: [input.contentType],
-      maximumSizeInBytes: MAX_MEDIA_BYTES,
-      addRandomSuffix: false,
-      allowOverwrite: false,
-      validUntil,
-    });
-    return { uploadUrl: presignedUrl, key };
-  }),
-
-  completeUpload: authedQuery.input(z.object({
-    key: z.string().max(512),
-    name: z.string().trim().min(1).max(180),
-    contentType: uploadContentType,
-    size: z.number().int().min(1).max(MAX_MEDIA_BYTES),
-  })).mutation(async ({ ctx, input }) => {
-    if (!input.key.startsWith(`u/${ctx.user.id}/`)) {
-      throw new TRPCError({ code: "FORBIDDEN", message: "Este archivo no pertenece a tu cuenta." });
-    }
-    const metadata = await head(input.key);
-    if (metadata.pathname !== input.key || metadata.size !== input.size || metadata.size > MAX_MEDIA_BYTES) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "No pudimos verificar el archivo subido." });
-    }
-    if (metadata.contentType !== input.contentType) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "El tipo de archivo no coincide con el contenido subido." });
-    }
-    await getDb().insert(files).values({
-      key: input.key,
-      ownerId: ctx.user.id,
-      name: input.name,
-      size: metadata.size,
-      contentType: input.contentType,
-    }).onDuplicateKeyUpdate({ set: { name: input.name, size: metadata.size, contentType: input.contentType } });
-    return { key: input.key, contentType: input.contentType };
-  }),
-
   mediaUrl: authedQuery.input(z.object({ key: z.string().max(512) }))
     .query(async ({ input }) => {
       const known = await getDb().query.files.findFirst({ where: eq(files.key, input.key) });
       if (!known) throw new TRPCError({ code: "NOT_FOUND" });
-      const signedToken = await issueSignedToken({
-        pathname: input.key,
-        operations: ["get"],
-        validUntil: Date.now() + 10 * 60 * 1000,
-      });
-      const { presignedUrl } = await presignUrl(signedToken, {
-        operation: "get",
-        pathname: input.key,
-        access: "private",
-        validUntil: Date.now() + 5 * 60 * 1000,
-      });
-      return { url: presignedUrl };
+      try {
+        const url = await signReadUrl(input.key);
+        return { url };
+      } catch (error) {
+        log.error("sign read url failed", {
+          key: input.key,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "No pudimos firmar el archivo." });
+      }
     }),
 });
