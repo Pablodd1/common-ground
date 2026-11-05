@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import { getDb } from "../api/queries/connection";
+import { getDb } from "../server/queries/connection";
 import { comments, posts, users } from "./schema";
 
 const samplePeople = [

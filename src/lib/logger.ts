@@ -33,7 +33,7 @@ const SEND_MAX_LINES = 50;
 // Correlation with the server's request id.
 //
 // The server stamps every response with X-Request-Id (see
-// api/lib/requestcontext.ts). Browser errors are emitted *after* the failing
+// server/lib/requestcontext.ts). Browser errors are emitted *after* the failing
 // call — usually from a catch that runs once the response has already arrived —
 // so the id available at emit time is the id of the request that just failed.
 //

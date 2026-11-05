@@ -30,7 +30,6 @@ dist-ssr
 *.db
 *.sqlite
 *.sqlite3
-db/migrations/*.sql
 # TypeScript cache
 *.tsbuildinfo
 # Build outputs
@@ -39,3 +38,17 @@ build/
 # Test coverage
 coverage/
 .nyc_output/
+
+# Vercel and local browser/test state
+.vercel
+.playwright-cli/
+playwright-report/
+test-results/
+auth.json
+*-auth.json
+
+# Screenshots, exports and database dumps
+*.webm
+*.sql.dump
+*.dump
+dump.sql

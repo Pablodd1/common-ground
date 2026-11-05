@@ -14,36 +14,52 @@ export function MediaView({ mediaKey, mediaType, className = "" }: { mediaKey: s
   return <img className={`shared-image ${className}`} src={data.url} alt="Foto compartida por un compañero" loading="lazy" />;
 }
 
-async function toBase64(file: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result).split(",")[1] ?? "");
-    reader.onerror = () => reject(new Error("No pudimos leer este archivo."));
-    reader.readAsDataURL(file);
-  });
+const supportedContentTypes = [
+  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav",
+] as const;
+type SupportedContentType = typeof supportedContentTypes[number];
+
+function isSupportedContentType(value: string): value is SupportedContentType {
+  return supportedContentTypes.includes(value as SupportedContentType);
 }
 
 export function useMediaUpload() {
   const [attachment, setAttachment] = useState<Attachment>(null);
-  const upload = trpc.community.upload.useMutation({
-    onError: (error) => toast.error(error.message || "No pudimos subir el archivo. Intenta con uno más pequeño."),
-  });
+  const [isUploading, setIsUploading] = useState(false);
+  const createUploadUrl = trpc.community.createUploadUrl.useMutation();
+  const completeUpload = trpc.community.completeUpload.useMutation();
 
   async function uploadFile(file: Blob, name: string, contentType: string) {
-    if (file.size > 12_000_000) {
-      toast.error("Elige un archivo de menos de 12 MB.");
+    if (!file.size || file.size > 12_000_000) {
+      toast.error("Elige un archivo de entre 1 byte y 12 MB.");
       return;
     }
+    if (!isSupportedContentType(contentType)) {
+      toast.error("Este tipo de archivo no está permitido. Usa una imagen o una nota de voz compatible.");
+      return;
+    }
+    setIsUploading(true);
     try {
-      const saved = await upload.mutateAsync({ name, contentBase64: await toBase64(file), contentType });
+      const target = await createUploadUrl.mutateAsync({ name, contentType, size: file.size });
+      const response = await fetch(target.uploadUrl, {
+        method: "PUT",
+        headers: { "content-type": contentType },
+        body: file,
+      });
+      if (!response.ok) throw new Error("Vercel Blob rechazó el archivo.");
+      const saved = await completeUpload.mutateAsync({ key: target.key, name, contentType, size: file.size });
       setAttachment({ ...saved, name });
       toast.success("Archivo listo para compartir");
-    } catch {
-      // La mutación muestra un error específico y comprensible para la persona.
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No pudimos subir el archivo.";
+      toast.error(message || "No pudimos subir el archivo. Intenta con uno más pequeño.");
+    } finally {
+      setIsUploading(false);
     }
   }
 
-  return { attachment, setAttachment, uploadFile, isUploading: upload.isPending };
+  return { attachment, setAttachment, uploadFile, isUploading };
 }
 
 export function MediaButtons({

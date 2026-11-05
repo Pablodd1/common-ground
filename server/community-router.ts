@@ -4,9 +4,14 @@ import { z } from "zod";
 import { comments, conversations, files, likes, messages, posts, users } from "@db/schema";
 import { authedQuery, createRouter } from "./middleware";
 import { getDb } from "./queries/connection";
-import { storage } from "./lib/storage";
+import { head, issueSignedToken, presignUrl } from "@vercel/blob";
 
 const topicSchema = z.enum(["Motivation", "Outside work", "Wins", "Questions", "Celebration"]);
+const uploadContentType = z.enum([
+  "image/jpeg", "image/png", "image/webp", "image/gif",
+  "audio/webm", "audio/ogg", "audio/mp4", "audio/mpeg", "audio/wav",
+]);
+const MAX_MEDIA_BYTES = 12_000_000;
 const mediaInput = z.object({
   mediaKey: z.string().max(512).optional(),
   mediaType: z.string().max(120).optional(),
@@ -243,35 +248,78 @@ export const communityRouter = createRouter({
       return { ok: true };
     }),
 
-  upload: authedQuery.input(z.object({
-    name: z.string().min(1).max(180),
-    contentBase64: z.string().max(17_000_000),
-    contentType: z.string().regex(/^(image\/(jpeg|png|webp|gif)|audio\/(webm|ogg|mp4|mpeg|wav))$/),
+  createUploadUrl: authedQuery.input(z.object({
+    name: z.string().trim().min(1).max(180),
+    contentType: uploadContentType,
+    size: z.number().int().min(1).max(MAX_MEDIA_BYTES),
   })).mutation(async ({ ctx, input }) => {
-    const bytes = Uint8Array.from(Buffer.from(input.contentBase64, "base64"));
-    if (!bytes.length || bytes.length > 12_000_000) {
-      throw new TRPCError({ code: "PAYLOAD_TOO_LARGE", message: "Los archivos deben pesar entre 1 byte y 12 MB." });
-    }
-    const safeName = input.name.replace(/[\\/\u0000-\u001f]/g, "-").replace(/\.\./g, "-");
-    const saved = await storage.uploadFile({
-      fileContent: bytes,
-      fileName: `u/${ctx.user.id}/${Date.now()}-${safeName}`,
-      contentType: input.contentType,
+    const safeName = input.name
+      .replace(/[\\/\u0000-\u001f]/g, "-")
+      .replace(/\.\./g, "-")
+      .slice(-140);
+    const key = `u/${ctx.user.id}/${Date.now()}-${safeName}`;
+    const validUntil = Date.now() + 10 * 60 * 1000;
+    const signedToken = await issueSignedToken({
+      pathname: key,
+      operations: ["put"],
+      allowedContentTypes: [input.contentType],
+      maximumSizeInBytes: MAX_MEDIA_BYTES,
+      validUntil,
     });
+    const { presignedUrl } = await presignUrl(signedToken, {
+      operation: "put",
+      pathname: key,
+      access: "private",
+      allowedContentTypes: [input.contentType],
+      maximumSizeInBytes: MAX_MEDIA_BYTES,
+      addRandomSuffix: false,
+      allowOverwrite: false,
+      validUntil,
+    });
+    return { uploadUrl: presignedUrl, key };
+  }),
+
+  completeUpload: authedQuery.input(z.object({
+    key: z.string().max(512),
+    name: z.string().trim().min(1).max(180),
+    contentType: uploadContentType,
+    size: z.number().int().min(1).max(MAX_MEDIA_BYTES),
+  })).mutation(async ({ ctx, input }) => {
+    if (!input.key.startsWith(`u/${ctx.user.id}/`)) {
+      throw new TRPCError({ code: "FORBIDDEN", message: "Este archivo no pertenece a tu cuenta." });
+    }
+    const metadata = await head(input.key);
+    if (metadata.pathname !== input.key || metadata.size !== input.size || metadata.size > MAX_MEDIA_BYTES) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "No pudimos verificar el archivo subido." });
+    }
+    if (metadata.contentType !== input.contentType) {
+      throw new TRPCError({ code: "BAD_REQUEST", message: "El tipo de archivo no coincide con el contenido subido." });
+    }
     await getDb().insert(files).values({
-      key: saved.key,
+      key: input.key,
       ownerId: ctx.user.id,
       name: input.name,
-      size: saved.size,
+      size: metadata.size,
       contentType: input.contentType,
-    });
-    return { key: saved.key, contentType: input.contentType };
+    }).onDuplicateKeyUpdate({ set: { name: input.name, size: metadata.size, contentType: input.contentType } });
+    return { key: input.key, contentType: input.contentType };
   }),
 
   mediaUrl: authedQuery.input(z.object({ key: z.string().max(512) }))
     .query(async ({ input }) => {
       const known = await getDb().query.files.findFirst({ where: eq(files.key, input.key) });
       if (!known) throw new TRPCError({ code: "NOT_FOUND" });
-      return storage.getPresignedUrl({ key: input.key });
+      const signedToken = await issueSignedToken({
+        pathname: input.key,
+        operations: ["get"],
+        validUntil: Date.now() + 10 * 60 * 1000,
+      });
+      const { presignedUrl } = await presignUrl(signedToken, {
+        operation: "get",
+        pathname: input.key,
+        access: "private",
+        validUntil: Date.now() + 5 * 60 * 1000,
+      });
+      return { url: presignedUrl };
     }),
 });
