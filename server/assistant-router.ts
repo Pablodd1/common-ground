@@ -1,4 +1,3 @@
-import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { generateText } from "ai";
 import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -6,15 +5,7 @@ import { z } from "zod";
 import { assistantMessages, companyResources } from "@db/schema";
 import { adminQuery, authedQuery, createRouter } from "./middleware";
 import { getDb } from "./queries/connection";
-import {
-  AiInvalidRequest,
-  AiMisconfigured,
-  AiTransient,
-  AiUnavailable,
-  ContentRejected,
-  classifyAiError,
-  listModels,
-} from "./lib/ai-client";
+import { deepseekModel, friendlyAiError } from "./lib/ai";
 import { companyManual, normalize, retrieveManualSources, toManualSource, type ManualDocument, type ManualSource } from "./lib/company-manual";
 
 type CompanyResource = typeof companyResources.$inferSelect;
@@ -54,31 +45,6 @@ function resourceToDocument(resource: CompanyResource): ManualDocument {
 async function loadInternalDocuments(includeDrafts = false) {
   const resources = await getDb().select().from(companyResources).orderBy(asc(companyResources.category), asc(companyResources.title));
   return resources.filter((resource) => includeDrafts || resource.isPublished).map(resourceToDocument);
-}
-
-function friendlyAiError(error: unknown): TRPCError {
-  const classified = classifyAiError(error);
-  if (classified instanceof AiUnavailable) {
-    return new TRPCError({
-      code: "PRECONDITION_FAILED",
-      message: "El asistente de la empresa no está disponible porque el cupo de IA del sitio está agotado. Un administrador debe agregar cupo en Kimi.",
-      cause: classified,
-    });
-  }
-  if (classified instanceof AiMisconfigured) {
-    return new TRPCError({ code: "PRECONDITION_FAILED", message: "La configuración del asistente debe restablecerse. Contacta al administrador del sitio.", cause: classified });
-  }
-  if (classified instanceof ContentRejected) {
-    return new TRPCError({ code: "BAD_REQUEST", message: "No pudimos procesar esa pregunta. Reformúlala con información relacionada con la empresa.", cause: classified });
-  }
-  if (classified instanceof AiTransient) {
-    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no está disponible temporalmente. No volvimos a enviar tu pregunta automáticamente; inténtalo de nuevo dentro de un momento.", cause: classified });
-  }
-  if (classified instanceof AiInvalidRequest) {
-    console.error("Error en la solicitud del asistente de empresa:", classified.message);
-    return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no pudo procesar esta solicitud. Intenta con otra pregunta.", cause: classified });
-  }
-  return new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "El asistente no está disponible temporalmente. Inténtalo de nuevo más tarde.", cause: classified });
 }
 
 export const assistantRouter = createRouter({
@@ -126,19 +92,12 @@ export const assistantRouter = createRouter({
         ].join("\n")).join("\n\n---\n\n");
 
         try {
-          const { defaultModelId } = await listModels();
-          const kimiGw = createOpenAICompatible({
-            name: "kimi-gw",
-            baseURL: process.env.KIMI_AGENTGW_BASE_URL!,
-            apiKey: process.env.KIMI_AGENTGW_API_KEY!,
-            includeUsage: true,
-            supportsStructuredOutputs: true,
-          });
           const result = await generateText({
-            model: kimiGw(defaultModelId),
+            model: deepseekModel(),
             system: `Eres el asistente del manual de empresa para los colaboradores de UNITEC USA Design. Responde siempre en español de Colombia, con un tono claro, cercano y respetuoso, sin importar el idioma de la pregunta. Usa ÚNICAMENTE las fuentes públicas del sitio web y los recursos internos publicados por administradores que se suministran aquí. Nunca uses conocimiento externo ni inventes datos del personal, número de empleados, políticas internas, precios, existencias, promociones, fechas, garantías, capacidades o compromisos. No deduzcas servicios o usos no escritos a partir de un canal de contacto o una ubicación. Si las fuentes no responden la pregunta, dilo claramente y sugiere consultar al equipo interno correspondiente. Sé conciso, cálido y práctico, normalmente en menos de 220 palabras. Usa párrafos cortos de texto sencillo o listas simples con guiones. No uses marcadores de Markdown como **, ## ni enlaces en negrita. No afirmes ser humano, abogado ni una aprobación oficial. Distingue los términos públicos del sitio web de las políticas internas de RR. HH. Si la pregunta trata sobre la política de privacidad de otro producto, deja claro ese alcance. No incluyas enlaces en la respuesta; la interfaz muestra por separado los enlaces exactos de las fuentes.`,
             prompt: `${context ? `CONVERSACIÓN RECIENTE (solo contexto; nunca es una fuente factual):\n${context}\n\n` : ""}ÚLTIMA PREGUNTA DEL COLABORADOR:\n${input.question}\n\nFUENTES PÚBLICAS E INTERNAS DE LA EMPRESA:\n${sourceText}`,
-            providerOptions: { "kimi-gw": { max_completion_tokens: 1000 } },
+            // DeepSeek usa max_tokens (no admite max_completion_tokens).
+            maxOutputTokens: 1000,
           });
           answer = result.text.trim();
           if (!answer) throw new Error("El modelo devolvió una respuesta vacía.");
@@ -150,7 +109,7 @@ export const assistantRouter = createRouter({
       const db = getDb();
       const saved = await db.transaction(async (tx) => {
         await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "user", body: input.question, sources: [], answered: documents.length > 0 });
-        const [{ id }] = await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "assistant", body: answer, sources }).$returningId();
+        const [{ id }] = await tx.insert(assistantMessages).values({ userId: ctx.user.id, role: "assistant", body: answer, sources }).returning({ id: assistantMessages.id });
         return id;
       });
       return { id: saved, answer, sources };
@@ -191,7 +150,7 @@ export const assistantRouter = createRouter({
         await getDb().update(companyResources).set(values).where(eq(companyResources.id, input.id));
         return { id: input.id };
       }
-      const [{ id }] = await getDb().insert(companyResources).values(values).$returningId();
+      const [{ id }] = await getDb().insert(companyResources).values(values).returning({ id: companyResources.id });
       return { id };
     }),
 

@@ -33,6 +33,9 @@ export const publicQuery = t.procedure;
 const requireAuth = t.middleware(async (opts) => {
   const { ctx, next } = opts;
 
+  if (ctx.domainRejected) {
+    throw new TRPCError({ code: "FORBIDDEN", message: ErrorMessages.domainNotAllowed });
+  }
   if (!ctx.user) {
     throw new TRPCError({
       code: "UNAUTHORIZED",

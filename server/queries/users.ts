@@ -1,41 +1,33 @@
 import { eq } from "drizzle-orm";
-import * as schema from "@db/schema";
-import type { InsertUser } from "@db/schema";
+import { users } from "@db/schema";
 import { getDb } from "./connection";
 import { env } from "../lib/env";
 
-export async function findUserByUnionId(unionId: string) {
-  const rows = await getDb()
-    .select()
-    .from(schema.users)
-    .where(eq(schema.users.unionId, unionId))
-    .limit(1);
-  return rows.at(0);
+export type AuthIdentity = { authId: string; email: string; name?: string | null; avatar?: string | null };
+
+export async function findUserByAuthId(authId: string) {
+  return getDb().query.users.findFirst({ where: eq(users.authId, authId) });
 }
 
-export async function upsertUser(data: InsertUser) {
-  const values = { ...data };
-  // En un inicio de sesión posterior NO se sobrescribe `name`: la persona puede
-  // haberlo cambiado en su perfil y el nombre del proveedor OAuth lo borraría en
-  // cada login. El nombre del proveedor solo se usa al crear la cuenta.
-  const { name: _providerName, ...returning } = data;
-  void _providerName;
-  const updateSet: Partial<InsertUser> = {
+/**
+ * Crea el perfil la primera vez que alguien inicia sesión y actualiza correo y
+ * último acceso después. NUNCA sobrescribe el nombre: la persona lo edita en su perfil.
+ * Quien esté en OWNER_EMAIL recibe el rol de administrador.
+ */
+export async function upsertUserFromAuth(identity: AuthIdentity) {
+  const email = identity.email.toLowerCase();
+  const isOwner = env.ownerEmails.includes(email);
+  const fallbackName = email.split("@")[0].replace(/[._-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+  const [user] = await getDb().insert(users).values({
+    authId: identity.authId,
+    email,
+    name: identity.name?.trim() || fallbackName,
+    avatar: identity.avatar ?? null,
+    role: isOwner ? "admin" : "user",
     lastSignInAt: new Date(),
-    ...returning,
-  };
-
-  if (
-    values.role === undefined &&
-    values.unionId &&
-    values.unionId === env.ownerUnionId
-  ) {
-    values.role = "admin";
-    updateSet.role = "admin";
-  }
-
-  await getDb()
-    .insert(schema.users)
-    .values(values)
-    .onDuplicateKeyUpdate({ set: updateSet });
+  }).onConflictDoUpdate({
+    target: users.authId,
+    set: { email, lastSignInAt: new Date(), ...(isOwner ? { role: "admin" as const } : {}) },
+  }).returning();
+  return user;
 }

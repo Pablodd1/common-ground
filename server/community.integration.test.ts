@@ -1,36 +1,39 @@
 /**
- * Pruebas de integración contra un MySQL real.
+ * Pruebas de integración contra un Postgres real (como Supabase).
  *
  * Se ejecutan solo si TEST_DATABASE_URL apunta a una base cuyo nombre termina en
  * "_test". La base se BORRA y se vuelve a crear con las migraciones del repositorio,
  * así que nunca uses aquí la base de producción.
  *
- *   TEST_DATABASE_URL=mysql://user:pass@127.0.0.1:3306/unitec_test npm test
+ *   TEST_DATABASE_URL=postgres://user:pass@127.0.0.1:5432/unitec_test npm test
  */
 import { beforeAll, describe, expect, it, vi } from "vitest";
 import path from "node:path";
-import mysql from "mysql2/promise";
+import pg from "pg";
 
 const testUrl = process.env.TEST_DATABASE_URL;
 const dbName = testUrl ? new URL(testUrl).pathname.replace(/^\//, "") : "";
 const enabled = Boolean(testUrl) && dbName.endsWith("_test");
 
-// Vercel Blob no está disponible en pruebas: se simulan sus tres funciones.
-vi.mock("@vercel/blob", () => ({
-  issueSignedToken: vi.fn(async () => "signed-token"),
-  presignUrl: vi.fn(async (_token: string, options: { pathname: string; operation: string }) => ({
-    presignedUrl: `https://blob.test/${options.operation}/${options.pathname}`,
-  })),
-  head: vi.fn(async (key: string) => {
-    if (key.includes("missing")) throw new Error("BlobNotFoundError");
-    return { pathname: key, size: 100, contentType: key.endsWith(".webm") ? "audio/webm" : "image/png" };
+// Supabase (Auth y Storage) no está disponible en pruebas: se simula.
+const storedObjects = new Map<string, { size: number; contentType: string }>();
+const authUsers = new Map<string, { id: string; email: string; name: string | null; avatar: string | null }>();
+vi.mock("./lib/supabase", () => ({
+  createUploadTarget: vi.fn(async (path: string) => {
+    if (!path.includes("missing")) storedObjects.set(path, { size: 100, contentType: path.endsWith(".webm") ? "audio/webm" : "image/png" });
+    return { path, token: "upload-token", signedUrl: `https://storage.test/upload/${path}` };
   }),
+  getStoredObject: vi.fn(async (path: string) => storedObjects.get(path) ?? null),
+  createReadUrl: vi.fn(async (path: string) => `https://storage.test/read/${path}`),
+  verifyAccessToken: vi.fn(async (token: string) => authUsers.get(token) ?? null),
 }));
 
 type Modules = {
   appRouter: typeof import("./router").appRouter;
   getDb: typeof import("./queries/connection").getDb;
-  upsertUser: typeof import("./queries/users").upsertUser;
+  upsertUserFromAuth: typeof import("./queries/users").upsertUserFromAuth;
+  authenticateRequest: typeof import("./auth").authenticateRequest;
+  DomainNotAllowedError: typeof import("./auth").DomainNotAllowedError;
   schema: typeof import("@db/schema");
   eq: typeof import("drizzle-orm").eq;
 };
@@ -52,32 +55,39 @@ async function upload(user: User, name: string) {
   return key;
 }
 
-describe.skipIf(!enabled)("community router (MySQL)", () => {
+describe.skipIf(!enabled)("community router (Postgres)", () => {
   beforeAll(async () => {
     const server = new URL(testUrl!);
     server.pathname = "/";
-    const root = await mysql.createConnection(server.toString());
-    await root.query(`DROP DATABASE IF EXISTS \`${dbName}\``);
-    await root.query(`CREATE DATABASE \`${dbName}\``);
+    server.pathname = "/postgres";
+    const root = new pg.Client({ connectionString: server.toString() });
+    await root.connect();
+    await root.query(`DROP DATABASE IF EXISTS "${dbName}" WITH (FORCE)`);
+    await root.query(`CREATE DATABASE "${dbName}"`);
     await root.end();
 
     process.env.DATABASE_URL = testUrl;
-    const { drizzle } = await import("drizzle-orm/mysql2");
-    const { migrate } = await import("drizzle-orm/mysql2/migrator");
-    const migrationDb = drizzle(testUrl!);
-    await migrate(migrationDb, { migrationsFolder: path.resolve(import.meta.dirname, "../db/migrations") });
-    await migrationDb.$client.end();
+    process.env.ALLOWED_EMAIL_DOMAINS = "unitec.test";
+    process.env.OWNER_EMAIL = "jefa@unitec.test";
+    const { drizzle } = await import("drizzle-orm/node-postgres");
+    const { migrate } = await import("drizzle-orm/node-postgres/migrator");
+    const migrationPool = new pg.Pool({ connectionString: testUrl });
+    await migrate(drizzle(migrationPool), { migrationsFolder: path.resolve(import.meta.dirname, "../db/migrations") });
+    await migrationPool.end();
 
     m = {
       appRouter: (await import("./router")).appRouter,
       getDb: (await import("./queries/connection")).getDb,
-      upsertUser: (await import("./queries/users")).upsertUser,
+      upsertUserFromAuth: (await import("./queries/users")).upsertUserFromAuth,
+      authenticateRequest: (await import("./auth")).authenticateRequest,
+      DomainNotAllowedError: (await import("./auth")).DomainNotAllowedError,
       schema: await import("@db/schema"),
       eq: (await import("drizzle-orm")).eq,
     };
-    const create = async (unionId: string, name: string, role: "user" | "admin" = "user") => {
-      await m.upsertUser({ unionId, name, role });
-      return (await m.getDb().query.users.findFirst({ where: m.eq(m.schema.users.unionId, unionId) }))!;
+    const create = async (authId: string, name: string, role: "user" | "admin" = "user") => {
+      const user = await m.upsertUserFromAuth({ authId, email: `${authId.slice(2)}@unitec.test`, name });
+      if (role === "admin") await m.getDb().update(m.schema.users).set({ role }).where(m.eq(m.schema.users.id, user.id));
+      return (await m.getDb().query.users.findFirst({ where: m.eq(m.schema.users.id, user.id) }))!;
     };
     alice = await create("t:alice", "Alice");
     bob = await create("t:bob", "Bob");
@@ -85,10 +95,32 @@ describe.skipIf(!enabled)("community router (MySQL)", () => {
     admin = await create("t:admin", "Admin", "admin");
   }, 120_000);
 
+  it("inicio de sesión: dominio autorizado, dominio rechazado y administrador por correo", async () => {
+    authUsers.set("tok-ok", { id: "auth-new", email: "Nuevo.Colega@UNITEC.test", name: null, avatar: null });
+    authUsers.set("tok-gmail", { id: "auth-gmail", email: "alguien@gmail.com", name: null, avatar: null });
+    authUsers.set("tok-boss", { id: "auth-boss", email: "jefa@unitec.test", name: "Jefa", avatar: null });
+    const headers = (token: string) => new Headers({ authorization: `Bearer ${token}` });
+
+    const created = await m.authenticateRequest(headers("tok-ok"));
+    expect(created).toMatchObject({ email: "nuevo.colega@unitec.test", name: "Nuevo Colega", role: "user" });
+    await expect(m.authenticateRequest(headers("tok-gmail"))).rejects.toBeInstanceOf(m.DomainNotAllowedError);
+    expect(await m.getDb().query.users.findFirst({ where: m.eq(m.schema.users.authId, "auth-gmail") })).toBeUndefined();
+    expect((await m.authenticateRequest(headers("tok-boss")))?.role).toBe("admin");
+    expect(await m.authenticateRequest(headers("tok-desconocido"))).toBeNull();
+    expect(await m.authenticateRequest(new Headers())).toBeNull();
+
+    const { createContext } = await import("./context");
+    const ctx = await createContext({ req: new Request("http://localhost/", { headers: headers("tok-gmail") }), resHeaders: new Headers() } as never);
+    await expect(m.appRouter.createCaller(ctx).auth.me()).rejects.toMatchObject({ code: "FORBIDDEN" });
+  });
+
   it("las migraciones crean todas las tablas en una base nueva", async () => {
     const { sql } = await import("drizzle-orm");
-    const [rows] = await m.getDb().execute(sql`SHOW TABLES`);
-    const tables = (rows as unknown as Record<string, string>[]).map((row) => Object.values(row)[0]);
+    const result = await m.getDb().execute(sql`SELECT tablename, rowsecurity FROM pg_tables WHERE schemaname = 'public'`);
+    const rows = result.rows as { tablename: string; rowsecurity: boolean }[];
+    const tables = rows.map((row) => row.tablename);
+    // RLS activado en todas: la API pública de Supabase no puede leer estas tablas.
+    expect(rows.filter((row) => !row.tablename.startsWith("__")).every((row) => row.rowsecurity)).toBe(true);
     expect(tables).toEqual(expect.arrayContaining([
       "assistantMessages", "comments", "companyResources", "conversations", "files", "likes", "messages", "posts", "users",
     ]));
@@ -99,10 +131,9 @@ describe.skipIf(!enabled)("community router (MySQL)", () => {
       name: "Alice Editada", jobTitle: "", department: "", location: "", bio: "", interests: [],
       birthday: "", startDate: "", shareBirthday: true, shareLocation: true, avatarKey: null,
     });
-    await m.upsertUser({ unionId: "t:alice", name: "Alice (OAuth)", avatar: "https://a.test/x.png", lastSignInAt: new Date() });
+    await m.upsertUserFromAuth({ authId: "t:alice", email: "alice@unitec.test", name: "Alice (proveedor)" });
     const me = await caller(alice).community.me();
     expect(me.name).toBe("Alice Editada");
-    expect(me.avatar).toBe("https://a.test/x.png");
   });
 
   it("los adjuntos de mensajes directos solo los ven los participantes", async () => {

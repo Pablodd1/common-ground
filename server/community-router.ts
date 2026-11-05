@@ -5,7 +5,8 @@ import { comments, conversations, files, likes, messages, posts, users } from "@
 import { authedQuery, createRouter } from "./middleware";
 import type { User } from "@db/schema";
 import { getDb } from "./queries/connection";
-import { head, issueSignedToken, presignUrl } from "@vercel/blob";
+import { createReadUrl, createUploadTarget, getStoredObject } from "./lib/supabase";
+import { env } from "./lib/env";
 
 const topicSchema = z.enum(["Motivation", "Outside work", "Wins", "Questions", "Celebration"]);
 const uploadContentType = z.enum([
@@ -192,7 +193,7 @@ export const communityRouter = createRouter({
         topic: input.topic,
         mediaKey: media?.key ?? null,
         mediaType: media?.contentType ?? null,
-      }).$returningId();
+      }).returning({ id: posts.id });
       return created;
     }),
 
@@ -233,7 +234,7 @@ export const communityRouter = createRouter({
         return { liked: false };
       }
       // IGNORE: un doble clic simultáneo no debe terminar en un error 500 por la llave primaria.
-      await db.insert(likes).ignore().values({ postId: input.postId, userId: ctx.user.id });
+      await db.insert(likes).values({ postId: input.postId, userId: ctx.user.id }).onConflictDoNothing();
       return { liked: true };
     }),
 
@@ -301,7 +302,7 @@ export const communityRouter = createRouter({
       if (!conversation) {
         // IGNORE + relectura: si ambas personas abren la conversación al mismo tiempo,
         // el índice único evita duplicados y ninguna de las dos recibe un error.
-        await db.insert(conversations).ignore().values({ userOneId, userTwoId });
+        await db.insert(conversations).values({ userOneId, userTwoId }).onConflictDoNothing();
         conversation = await db.query.conversations.findFirst({ where: pair });
       }
       if (!conversation) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
@@ -345,31 +346,19 @@ export const communityRouter = createRouter({
     contentType: uploadContentType,
     size: z.number().int().min(1).max(MAX_MEDIA_BYTES),
   })).mutation(async ({ ctx, input }) => {
+    // Supabase Storage solo acepta ciertos caracteres en las rutas: quitamos tildes y
+    // dejamos letras, números, punto, guion y guion bajo. El nombre original se guarda aparte.
     const safeName = input.name
-      // eslint-disable-next-line no-control-regex -- se eliminan a propósito los caracteres de control.
-      .replace(/[\\/\u0000-\u001f]/g, "-")
-      .replace(/\.\./g, "-")
-      .slice(-140);
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9._-]+/g, "-")
+      .replace(/\.{2,}/g, "-")
+      .replace(/^[-.]+/, "")
+      .slice(-140) || "archivo";
+    // El tamaño y tipo se vuelven a comprobar en completeUpload; el bucket además
+    // limita tamaño y tipos (ver scripts/setup-supabase.mjs).
     const key = `u/${ctx.user.id}/${Date.now()}-${safeName}`;
-    const validUntil = Date.now() + 10 * 60 * 1000;
-    const signedToken = await issueSignedToken({
-      pathname: key,
-      operations: ["put"],
-      allowedContentTypes: [input.contentType],
-      maximumSizeInBytes: MAX_MEDIA_BYTES,
-      validUntil,
-    });
-    const { presignedUrl } = await presignUrl(signedToken, {
-      operation: "put",
-      pathname: key,
-      access: "private",
-      allowedContentTypes: [input.contentType],
-      maximumSizeInBytes: MAX_MEDIA_BYTES,
-      addRandomSuffix: false,
-      allowOverwrite: false,
-      validUntil,
-    });
-    return { uploadUrl: presignedUrl, key };
+    const target = await createUploadTarget(key);
+    return { key: target.path, token: target.token, bucket: env.storageBucket };
   }),
 
   completeUpload: authedQuery.input(z.object({
@@ -381,11 +370,11 @@ export const communityRouter = createRouter({
     if (!input.key.startsWith(`u/${ctx.user.id}/`)) {
       throw new TRPCError({ code: "FORBIDDEN", message: "Este archivo no pertenece a tu cuenta." });
     }
-    const metadata = await head(input.key).catch(() => null);
+    const metadata = await getStoredObject(input.key).catch(() => null);
     if (!metadata) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "No encontramos el archivo subido. Intenta subirlo de nuevo." });
     }
-    if (metadata.pathname !== input.key || metadata.size !== input.size || metadata.size > MAX_MEDIA_BYTES) {
+    if (metadata.size !== input.size || metadata.size > MAX_MEDIA_BYTES) {
       throw new TRPCError({ code: "BAD_REQUEST", message: "No pudimos verificar el archivo subido." });
     }
     if (metadata.contentType !== input.contentType) {
@@ -397,7 +386,7 @@ export const communityRouter = createRouter({
       name: input.name,
       size: metadata.size,
       contentType: input.contentType,
-    }).onDuplicateKeyUpdate({ set: { name: input.name, size: metadata.size, contentType: input.contentType } });
+    }).onConflictDoUpdate({ target: files.key, set: { name: input.name, size: metadata.size, contentType: input.contentType } });
     return { key: input.key, contentType: input.contentType };
   }),
 
@@ -405,17 +394,6 @@ export const communityRouter = createRouter({
     .query(async ({ ctx, input }) => {
       // NOT_FOUND también cuando no hay permiso, para no confirmar que la clave existe.
       if (!(await canViewMedia(input.key, ctx.user.id))) throw new TRPCError({ code: "NOT_FOUND" });
-      const signedToken = await issueSignedToken({
-        pathname: input.key,
-        operations: ["get"],
-        validUntil: Date.now() + 10 * 60 * 1000,
-      });
-      const { presignedUrl } = await presignUrl(signedToken, {
-        operation: "get",
-        pathname: input.key,
-        access: "private",
-        validUntil: Date.now() + 5 * 60 * 1000,
-      });
-      return { url: presignedUrl };
+      return { url: await createReadUrl(input.key) };
     }),
 });

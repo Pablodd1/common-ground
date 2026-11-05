@@ -5,5 +5,5 @@ import { LOGIN_PATH } from "@/const";
 export default function Home() {
   const { isLoading, isAuthenticated, logout } = useAuth({ redirectOnUnauthenticated: true, redirectPath: LOGIN_PATH });
   if (isLoading || !isAuthenticated) return <div className="app-loading"><div className="loading-mark" /><p>Abriendo Unitec Familia…</p></div>;
-  return <CommunityApp onLogout={logout} />;
+  return <CommunityApp onLogout={() => void logout()} />;
 }
