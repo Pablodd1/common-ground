@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { Heart, MessageCircle, Send, Sparkles } from "lucide-react";
+import { Heart, MessageCircle, Send, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser, type FeedPost } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
@@ -84,12 +84,18 @@ function PostCard({ post, currentUser }: { post: FeedPost; currentUser: Communit
     onSuccess: () => { setComment(""); void utils.community.feed.invalidate(); },
     onError: (error) => toast.error(error.message),
   });
+  const remove = trpc.community.deletePost.useMutation({
+    onSuccess: () => { void utils.community.feed.invalidate(); toast.success("Publicación eliminada"); },
+    onError: (error) => toast.error(error.message),
+  });
+  const isOwn = post.author.id === currentUser.id;
 
   return <article className="post-card">
     <header className="post-header">
       <PersonAvatar person={post.author} />
       <div><strong>{post.author.name}{post.author.isDemo && <span className="sample-tag">EJEMPLO</span>}</strong><p>{post.author.jobTitle || "Colega"} · {formatDistanceToNow(post.createdAt, { addSuffix: true, locale: es })}</p></div>
       <span className="topic-label">{topicLabels[post.topic]}</span>
+      {isOwn && <button className="post-delete" onClick={() => { if (window.confirm("¿Eliminar esta publicación?")) remove.mutate({ postId: post.id }); }} disabled={remove.isPending} aria-label="Eliminar mi publicación" title="Eliminar mi publicación"><Trash2 /></button>}
     </header>
     {post.body && <p className="post-body">{post.body}</p>}
     {post.mediaKey && <MediaView mediaKey={post.mediaKey} mediaType={post.mediaType} />}

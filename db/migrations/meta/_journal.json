@@ -8,6 +8,13 @@
       "when": 1793907650618,
       "tag": "0000_cloudy_night_thrasher",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793932708376,
+      "tag": "0001_ordinary_maginty",
+      "breakpoints": true
     }
   ]
 }

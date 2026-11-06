@@ -142,3 +142,29 @@ export async function getUserByToken(accessToken: string): Promise<SupabaseUser>
     "Tu sesión con el proveedor no es válida. Vuelve a iniciar sesión.",
   );
 }
+
+/**
+ * Changes the caller's password. The current password is verified first by a
+ * real sign-in (Supabase has no "verify password" endpoint), and the update is
+ * sent with the session token from that same sign-in.
+ */
+export async function changePassword(
+  email: string,
+  currentPassword: string,
+  nextPassword: string,
+): Promise<void> {
+  const session = await signInWithPassword(email, currentPassword);
+  await authFetch<unknown>(
+    "/user",
+    {
+      method: "PUT",
+      headers: {
+        apikey: env.supabaseServiceKey,
+        Authorization: `Bearer ${session.access_token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ password: nextPassword }),
+    },
+    "No pudimos actualizar tu contraseña. Inténtalo de nuevo.",
+  );
+}

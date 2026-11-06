@@ -47,6 +47,9 @@ export const users = pgTable("users", {
   shareBirthday: boolean("shareBirthday").default(true).notNull(),
   shareLocation: boolean("shareLocation").default(true).notNull(),
   isDemo: boolean("isDemo").default(false).notNull(),
+  // Set by an admin to revoke access (offboarding): login is refused and
+  // existing sessions stop authenticating immediately. Null = active.
+  disabledAt: timestamp("disabledAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()

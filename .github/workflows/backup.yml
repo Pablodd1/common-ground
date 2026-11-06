@@ -1,0 +1,25 @@
+name: Respaldo de base de datos
+
+on:
+  schedule:
+    - cron: "30 4 * * 0" # domingos 04:30 UTC
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Instalar cliente de Postgres
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+      - name: Dump completo (esquema + datos)
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_BACKUP }}
+        run: |
+          pg_dump "$DATABASE_URL" --format=custom --no-owner --no-privileges \
+            --file "unitec-familia-$(date -u +%Y%m%d-%H%M).dump"
+      - name: Conservar respaldo 90 días
+        uses: actions/upload-artifact@v4
+        with:
+          name: unitec-familia-db-${{ github.run_id }}
+          path: "*.dump"
+          retention-days: 90

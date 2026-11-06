@@ -1,10 +1,10 @@
-import { and, asc, desc, eq, inArray, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { comments, conversations, files, likes, messages, posts, users } from "@db/schema";
 import { authedQuery, createRouter } from "./middleware";
 import { getDb } from "./queries/connection";
-import { signReadUrl } from "./lib/storage";
+import { removeObject, signReadUrl } from "./lib/storage";
 import { log } from "./lib/logger";
 
 const topicSchema = z.enum(["Motivation", "Outside work", "Wins", "Questions", "Celebration"]);
@@ -93,7 +93,11 @@ export const communityRouter = createRouter({
     }),
 
   people: authedQuery.query(async () => {
-    const people = await getDb().select().from(users).orderBy(users.name).limit(100);
+    // Disabled (offboarded) accounts disappear from the directory.
+    const people = await getDb().select().from(users)
+      .where(isNull(users.disabledAt))
+      .orderBy(users.name)
+      .limit(100);
     return people.map(publicPerson);
   }),
 
@@ -154,6 +158,51 @@ export const communityRouter = createRouter({
       return created;
     }),
 
+  deletePost: authedQuery.input(z.object({ postId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const deleted = await getDb().delete(posts)
+        .where(and(eq(posts.id, input.postId), eq(posts.authorId, ctx.user.id)))
+        .returning({ id: posts.id, mediaKey: posts.mediaKey });
+      if (!deleted.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Solo puedes eliminar tus propias publicaciones." });
+      }
+      // Orphaned media is left in storage/files on purpose: the same file may
+      // still be attached to a message, and garbage-collecting unreferenced
+      // uploads is a separate admin concern.
+      return { ok: true };
+    }),
+
+  deleteFile: authedQuery.input(z.object({ key: z.string().max(512) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const owned = await db.query.files.findFirst({
+        where: and(eq(files.key, input.key), eq(files.ownerId, ctx.user.id)),
+      });
+      if (!owned) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Este archivo no pertenece a tu cuenta." });
+      }
+      // Refuse while anything still renders it, so feeds and chats never grow
+      // broken images/players.
+      const referenced = await db.query.posts.findFirst({ where: eq(posts.mediaKey, input.key) })
+        ?? await db.query.messages.findFirst({ where: eq(messages.mediaKey, input.key) })
+        ?? await db.query.users.findFirst({ where: eq(users.avatarKey, input.key) });
+      if (referenced) {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Este archivo está en uso en una publicación, mensaje o perfil." });
+      }
+      await db.delete(files).where(eq(files.key, input.key));
+      try {
+        await removeObject(input.key);
+      } catch (error) {
+        // Row is gone; the object becomes an orphan for the storage cleanup
+        // pass. Not fatal for the user, but it must be visible in the log.
+        log.error("storage object delete failed after row delete", {
+          key: input.key,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+      return { ok: true };
+    }),
+
   toggleLike: authedQuery.input(z.object({ postId: z.number().int().positive() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -196,15 +245,31 @@ export const communityRouter = createRouter({
     const rows = await db.select().from(conversations)
       .where(or(eq(conversations.userOneId, ctx.user.id), eq(conversations.userTwoId, ctx.user.id)))
       .orderBy(desc(conversations.lastMessageAt)).limit(50);
-    return Promise.all(rows.map(async (conversation) => {
+    if (!rows.length) return [];
+    // Batched lookups: the partner profiles and the latest message per
+    // conversation each come back in one round-trip instead of one per row.
+    const otherIds = [...new Set(rows.map((c) => (c.userOneId === ctx.user.id ? c.userTwoId : c.userOneId)))];
+    const conversationIds = rows.map((c) => c.id);
+    const [others, recentMessages] = await Promise.all([
+      db.select().from(users).where(inArray(users.id, otherIds)),
+      db.select().from(messages).where(inArray(messages.conversationId, conversationIds))
+        .orderBy(desc(messages.createdAt)).limit(500),
+    ]);
+    const otherMap = new Map(others.map((person) => [person.id, publicPerson(person)]));
+    const lastByConversation = new Map<number, typeof recentMessages[number]>();
+    for (const message of recentMessages) {
+      if (!lastByConversation.has(message.conversationId)) {
+        lastByConversation.set(message.conversationId, message);
+      }
+    }
+    return rows.map((conversation) => {
       const otherId = conversation.userOneId === ctx.user.id ? conversation.userTwoId : conversation.userOneId;
-      const other = await db.query.users.findFirst({ where: eq(users.id, otherId) });
-      const last = await db.query.messages.findFirst({
-        where: eq(messages.conversationId, conversation.id),
-        orderBy: [desc(messages.createdAt)],
-      });
-      return { ...conversation, other: other ? publicPerson(other) : null, lastMessage: last ?? null };
-    }));
+      return {
+        ...conversation,
+        other: otherMap.get(otherId) ?? null,
+        lastMessage: lastByConversation.get(conversation.id) ?? null,
+      };
+    });
   }),
 
   openConversation: authedQuery.input(z.object({ personId: z.number().int().positive() }))

@@ -1,15 +1,49 @@
 import { Hono } from "hono";
 import { bodyLimit } from "hono/body-limit";
+import { secureHeaders } from "hono/secure-headers";
 import type { HttpBindings } from "@hono/node-server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "./router";
 import { createContext } from "./context";
+import { env } from "./lib/env";
 import { log } from "./lib/logger";
 import { handleClientLog } from "./lib/clientlog";
 import { handleMediaUpload } from "./media-upload";
 import { REQUEST_ID_HEADER, runWithRequestId } from "./lib/requestcontext";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
+
+// Baseline hardening for every response. The CSP is built around what the app
+// actually loads: same-origin scripts/styles (Tailwind + React inline style
+// attributes need 'unsafe-inline' for styles), and Supabase Storage for the
+// signed media URLs (<img>/<audio> and the upload fetch). `blob:` is kept for
+// the voice recorder's in-progress blobs. X-Robots-Tag: this is a private
+// employee space and must never be indexed.
+const supabaseOrigin = new URL(env.supabaseUrl || "https://invalid.local").origin;
+app.use(
+  "*",
+  secureHeaders({
+    contentSecurityPolicy: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:", supabaseOrigin],
+      mediaSrc: ["'self'", "blob:", supabaseOrigin],
+      connectSrc: ["'self'", supabaseOrigin],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'none'"],
+    },
+    crossOriginResourcePolicy: "same-site",
+    referrerPolicy: "strict-origin-when-cross-origin",
+  }),
+);
+app.use("*", async (c, next) => {
+  await next();
+  c.res.headers.set("x-robots-tag", "noindex, nofollow");
+});
 
 // One middleware for both halves of request observability, because they need the
 // same scope and the same id:

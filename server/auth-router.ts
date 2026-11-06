@@ -9,11 +9,13 @@ import {
   AuthRejected,
   adminCreateUser,
   assertEmailAllowed,
+  changePassword as supabaseChangePassword,
   signInWithPassword,
 } from "./auth/supabase";
 import { signSessionToken } from "./auth/session";
 import { upsertUserByAuthId } from "./queries/users";
 import { log } from "./lib/logger";
+import { clientIp, consumeRateLimit } from "./lib/rate-limit";
 
 const emailSchema = z
   .string()
@@ -24,6 +26,25 @@ const passwordSchema = z
   .string()
   .min(10, "La contraseña debe tener al menos 10 caracteres.")
   .max(128, "La contraseña es demasiado larga.");
+
+// Credential endpoints are rate limited per IP+email: 8 attempts / 5 minutes.
+// Supabase's own per-email limits back this up; see lib/rate-limit.ts for the
+// serverless caveats.
+const AUTH_RATE_LIMIT = { limit: 8, windowMs: 5 * 60 * 1000 };
+
+function enforceAuthRateLimit(headers: Headers, email: string): void {
+  const { allowed, retryAfterSeconds } = consumeRateLimit(
+    `${clientIp(headers)}|${email}`,
+    AUTH_RATE_LIMIT.limit,
+    AUTH_RATE_LIMIT.windowMs,
+  );
+  if (!allowed) {
+    throw new TRPCError({
+      code: "TOO_MANY_REQUESTS",
+      message: `Demasiados intentos. Espera ${retryAfterSeconds} segundos y vuelve a intentar.`,
+    });
+  }
+}
 
 function toAuthError(error: unknown): never {
   if (error instanceof AuthRejected) {
@@ -55,6 +76,7 @@ export const authRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       try {
+        enforceAuthRateLimit(ctx.req.headers, input.email);
         assertEmailAllowed(input.email);
         await adminCreateUser(input.email, input.password, input.name);
       } catch (error) {
@@ -69,6 +91,7 @@ export const authRouter = createRouter({
     .input(z.object({ email: emailSchema, password: passwordSchema }))
     .mutation(({ ctx, input }) => {
       try {
+        enforceAuthRateLimit(ctx.req.headers, input.email);
         assertEmailAllowed(input.email);
         return signInAndMintSession(ctx, input.email, input.password);
       } catch (error) {
@@ -77,6 +100,35 @@ export const authRouter = createRouter({
     }),
 
   me: authedQuery.query((opts) => opts.ctx.user),
+
+  // Password change requires the current password; no e-mail round-trip, so it
+  // works regardless of Supabase's Site URL / SMTP configuration.
+  changePassword: authedQuery
+    .input(
+      z.object({
+        current: z.string().min(1, "Ingresa tu contraseña actual."),
+        next: passwordSchema,
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.current === input.next) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "La nueva contraseña debe ser diferente de la actual.",
+        });
+      }
+      enforceAuthRateLimit(ctx.req.headers, ctx.user.email);
+      try {
+        await supabaseChangePassword(
+          ctx.user.email,
+          input.current,
+          input.next,
+        );
+      } catch (error) {
+        toAuthError(error);
+      }
+      return { ok: true };
+    }),
 
   logout: authedQuery.mutation(async ({ ctx }) => {
     const opts = getSessionCookieOptions(ctx.req.headers);
@@ -111,6 +163,11 @@ async function signInAndMintSession(
       profile.userMetadata?.full_name ??
       email.split("@")[0],
   });
+  if (user.disabledAt) {
+    throw new AuthRejected(
+      "Tu cuenta está desactivada. Contacta al administrador de la empresa.",
+    );
+  }
   const sessionToken = await signSessionToken({ authId: profile.id });
   const opts = getSessionCookieOptions(ctx.req.headers);
   const serialized = cookie.serialize(Session.cookieName, sessionToken, {

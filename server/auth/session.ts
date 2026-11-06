@@ -51,6 +51,10 @@ export async function authenticateRequest(headers: Headers): Promise<User> {
   if (!user) {
     throw new Error("User not found. Please re-login.");
   }
+  // Disabled accounts lose their existing sessions too, not just new logins.
+  if (user.disabledAt) {
+    throw new Error("Account is disabled.");
+  }
   return user;
 }
 

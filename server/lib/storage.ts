@@ -73,6 +73,25 @@ export async function putObject(
   }
 }
 
+/** Deletes an object; callers must have verified ownership first. */
+export async function removeObject(key: string): Promise<void> {
+  const resp = await fetch(
+    storageUrl(objectPath("/object", key)),
+    {
+      method: "DELETE",
+      headers: {
+        apikey: env.supabaseServiceKey,
+        Authorization: `Bearer ${env.supabaseServiceKey}`,
+      },
+      signal: AbortSignal.timeout(30_000),
+    },
+  );
+  if (!resp.ok && resp.status !== 404) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`Supabase Storage delete failed (${resp.status}): ${text.slice(0, 200)}`);
+  }
+}
+
 /** Short-lived read URL for rendering media in the browser. */
 export async function signReadUrl(
   key: string,

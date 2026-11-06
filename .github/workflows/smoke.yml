@@ -1,0 +1,21 @@
+name: Smoke de producción
+
+on:
+  schedule:
+    - cron: "0 */6 * * *" # cada 6 horas (UTC)
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Correr suite de smoke
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
+          SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
+        run: node scripts/smoke.mjs

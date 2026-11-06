@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { MapPin, MessageCircle, Search, X } from "lucide-react";
+import { MapPin, MessageCircle, Search, ShieldOff, ShieldCheck, X } from "lucide-react";
+import { toast } from "sonner";
 import { trpc, type CommunityUser, type Person } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +12,30 @@ export function People({ currentUser, onMessage }: { currentUser: CommunityUser;
   const [interest, setInterest] = useState("Todos los intereses");
   const [selected, setSelected] = useState<Person | null>(null);
   const people = trpc.community.people.useQuery();
+  const utils = trpc.useUtils();
+  const isUserAdmin = currentUser.role === "admin";
+  const adminUsers = trpc.admin.listUsers.useQuery(undefined, {
+    enabled: isUserAdmin,
+    refetchInterval: 15000,
+  });
+  const setDisabled = trpc.admin.setUserDisabled.useMutation({
+    onSuccess: async ({ disabledAt }) => {
+      toast.success(disabledAt ? "Cuenta desactivada" : "Cuenta reactivada");
+      await Promise.all([utils.admin.listUsers.invalidate(), utils.community.people.invalidate()]);
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const disabledIds = useMemo(
+    () => new Set((adminUsers.data ?? []).filter((u) => u.disabledAt).map((u) => u.id)),
+    [adminUsers.data],
+  );
+
+  function toggleAccount(userId: number, name: string | null, disabling: boolean) {
+    const message = disabling
+      ? `¿Desactivar la cuenta de ${name ?? "este usuario"}? No podrá iniciar sesión y desaparecerá del directorio.`
+      : `¿Reactivar la cuenta de ${name ?? "este usuario"}?`;
+    if (window.confirm(message)) setDisabled.mutate({ userId, disabled: disabling });
+  }
   const interests = useMemo(() => ["Todos los intereses", ...new Set(people.data?.flatMap((person) => person.interests) ?? [])].sort((a, b) => a === "Todos los intereses" ? -1 : b === "Todos los intereses" ? 1 : a.localeCompare(b)), [people.data]);
   const filtered = people.data?.filter((person) => {
     const query = search.toLowerCase();
@@ -42,6 +67,19 @@ export function People({ currentUser, onMessage }: { currentUser: CommunityUser;
           </button>
           {person.id !== currentUser.id && !person.isDemo && <Button variant="outline" onClick={() => onMessage(person)}><MessageCircle />Mensaje</Button>}
           {person.id === currentUser.id && <span className="self-label">Este eres tú</span>}
+          {isUserAdmin && person.id !== currentUser.id && !person.isDemo && (
+            <Button
+              variant="ghost"
+              className={disabledIds.has(person.id) ? "admin-toggle" : ""}
+              onClick={() => toggleAccount(person.id, person.name, !disabledIds.has(person.id))}
+              disabled={setDisabled.isPending}
+              aria-label={disabledIds.has(person.id) ? "Reactivar cuenta" : "Desactivar cuenta"}
+              title={disabledIds.has(person.id) ? "Reactivar cuenta (admin)" : "Desactivar cuenta (admin)"}
+            >
+              {disabledIds.has(person.id) ? <ShieldCheck /> : <ShieldOff />}
+              {disabledIds.has(person.id) ? "Reactivar" : "Desactivar"}
+            </Button>
+          )}
         </article>)}
       </div>}
       {!people.isLoading && !filtered.length && <div className="empty-state"><Search /><h2>No encontramos coincidencias.</h2><p>Prueba con otro nombre o amplía el filtro de intereses.</p><Button variant="outline" onClick={() => { setSearch(""); setInterest("Todos los intereses"); }}>Limpiar filtros</Button></div>}

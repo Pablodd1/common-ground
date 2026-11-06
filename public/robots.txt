@@ -1,0 +1,3 @@
+# Unitec Familia es una comunidad privada de empleados: nada se indexa.
+User-agent: *
+Disallow: /
