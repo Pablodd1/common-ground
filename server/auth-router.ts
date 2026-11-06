@@ -47,6 +47,9 @@ function enforceAuthRateLimit(headers: Headers, email: string): void {
 }
 
 function toAuthError(error: unknown): never {
+  // Deliberate tRPC answers (rate limit, validation) must pass through —
+  // swallowing them here would relabel a 429 as a generic 500.
+  if (error instanceof TRPCError) throw error;
   if (error instanceof AuthRejected) {
     throw new TRPCError({ code: "UNAUTHORIZED", message: error.message });
   }
