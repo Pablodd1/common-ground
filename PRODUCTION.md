@@ -7,11 +7,31 @@ Repo: `Pablodd1/common-ground` (privado) · Vercel: proyecto `common-ground` · 
 
 | Qué | Dónde | Frecuencia |
 |---|---|---|
-| Suite completa de smoke (38 chequeos: sesión, feed, asistente IA, fotos, administración, límite de intentos) | GitHub Actions «Smoke de producción» + `npm run smoke` local | Cada 6 horas |
+| Suite completa de smoke (48 chequeos: sesión, feed, asistente IA, fotos, administración, menciones, tickets, límite de intentos) | GitHub Actions «Smoke de producción» + `npm run smoke` local | Cada 6 horas |
 | CI (tipos, lint, tests, build) | GitHub Actions «CI» | En cada push/PR |
 | Respaldo `pg_dump` (esquema + datos, artefacto de 90 días) | GitHub Actions «Respaldo de base de datos» | Domingos 04:30 UTC (o manual) |
+| Limpieza de archivos huérfanos | GitHub Actions «Limpieza» → `POST /api/cron/cleanup` | Diario 03:17 UTC |
 
 Para correr el smoke a mano: `BASE_URL=https://… SMOKE_EMAIL=… SMOKE_PASSWORD=… npm run smoke`.
+
+## Menciones, tickets y avisos (nuevo)
+
+- **@menciones**: cada cuenta tiene un `@usuario` único (editable en el perfil). Escribir `@` en publicaciones, comentarios o mensajes abre el autocompletado; la persona recibe aviso en la campana y, según sus preferencias, por correo y Telegram.
+- **Telegram**: el usuario conecta su chat desde su perfil (Perfil → Avisos → Conectar Telegram → abrir el enlace de t.me). Requiere una sola configuración del administrador (ver abajo).
+- **`/ticket` (o `#ticket`)**: en el cuadro de publicaciones abre un ticket de soporte. Suena la campana de todos los administradores y salta el Telegram/correo del propietario. La bandeja vive en la pestaña **Empresa** (admin: resolver; usuarios: ver los suyos).
+
+### Activar Telegram (una sola vez, 3 minutos)
+
+1. En Telegram, hablar con **@BotFather** → `/newbot` → nombre y usuario del bot.
+2. Copiar el token y agregarlo en Vercel como `TELEGRAM_BOT_TOKEN` (Production+Preview).
+3. Opcional (aviso directo al dueño sin esperar al primer login): escribirle al bot desde tu Telegram, obtener tu chat id (p. ej. con @userinfobot) y agregar `TELEGRAM_OWNER_CHAT_ID`.
+4. Desplegar de nuevo. El webhook se registra solo la primera vez que un usuario genere su enlace.
+
+Sin token, todo lo demás sigue funcionando: la campana interna siempre registra el aviso y el smoke verifica la degradación limpia.
+
+### Correo (opcional)
+
+Agregar `RESEND_API_KEY` (y `RESEND_FROM` con dominio verificado) en Vercel. Sin dominio verificado, Resend solo entrega al dueño de la cuenta.
 
 ## Operaciones comunes
 
