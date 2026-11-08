@@ -9,6 +9,7 @@ import { env } from "./lib/env";
 import { log } from "./lib/logger";
 import { handleClientLog } from "./lib/clientlog";
 import { handleMediaUpload } from "./media-upload";
+import { handleTelegramWebhook } from "./telegram";
 import { REQUEST_ID_HEADER, runWithRequestId } from "./lib/requestcontext";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
@@ -104,6 +105,24 @@ app.use("/api/trpc/*", async (c) => {
     router: appRouter,
     createContext,
   });
+});
+// Telegram webhook for the "Conectar Telegram" flow — Telegram's servers call
+// this; authenticity comes from the secret-token header (verified inside).
+app.post(
+  "/api/telegram/webhook",
+  bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.body(null, 413) }),
+  handleTelegramWebhook,
+);
+// Daily orphan-upload sweep triggered by the GitHub Action; guarded by a
+// shared secret so nothing public can invoke it.
+app.post("/api/cron/cleanup", async (c) => {
+  const expected = process.env.CRON_SECRET ?? "";
+  if (!expected || c.req.header("x-cron-secret") !== expected) {
+    return c.json({ error: "No autorizado" }, 401);
+  }
+  const { cleanupOrphanUploads } = await import("./admin-router");
+  const result = await cleanupOrphanUploads();
+  return c.json(result);
 });
 // Proxied media upload (photos/voice notes) — see server/media-upload.ts.
 app.post(

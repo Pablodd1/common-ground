@@ -246,8 +246,87 @@ console.log("[8] Administración (bajas y altas)");
   }
 }
 
-// ---------- 9. Rate limiting ----------
-console.log("[9] Límite de intentos");
+// ---------- 9. Menciones @usuario ----------
+// Uses the offboarding fixture as mention target. Must run BEFORE the rate
+// limiting section, which burns that account's login budget on purpose.
+console.log("[9] Menciones @usuario");
+{
+  const fixtureJar2 = {};
+  const fixtureLogin = await trpc("auth.login", { method: "POST", input: { email: OFFBOARD_EMAIL, password: OFFBOARD_PASSWORD }, jar: fixtureJar2 });
+  const fixtureId = fixtureLogin.data?.user?.id;
+  if (fixtureId) {
+    const { data: fixtureMe } = await trpc("community.me", { jar: fixtureJar2 });
+    ok("handle @usuario asignado", typeof fixtureMe?.handle === "string" && fixtureMe.handle.length >= 2, `handle: ${fixtureMe?.handle}`);
+
+    const mentionPost = await trpc("community.createPost", {
+      method: "POST",
+      input: { body: `Verificación de menciones para @${fixtureMe.handle} desde el smoke`, topic: "Motivation" },
+      jar,
+    });
+    ok("publicación con mención creada", !!mentionPost.data?.id, mentionPost.error?.message);
+
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    const { data: notes } = await trpc("notifications.list", { jar: fixtureJar2 });
+    const sawMention = (notes?.items ?? []).some((n) => n.kind === "mention" && /te mencionó/i.test(n.title));
+    ok("la persona mencionada recibió el aviso", sawMention);
+
+    if (mentionPost.data?.id) {
+      await trpc("community.deletePost", { method: "POST", input: { postId: mentionPost.data.id }, jar });
+    }
+    await trpc("notifications.markAllRead", { method: "POST", jar: fixtureJar2 });
+
+    const { data: settings } = await trpc("notifications.settings", { jar: fixtureJar2 });
+    ok("ajustes de avisos legibles", typeof settings?.notifyByEmail === "boolean");
+    if (settings?.telegramConfigured) {
+      const { error: linkError } = await trpc("notifications.telegramLink", { method: "POST", jar: fixtureJar2 });
+      ok("enlace de Telegram se genera", !linkError, linkError?.message);
+    } else {
+      const { error: linkError } = await trpc("notifications.telegramLink", { method: "POST", jar: fixtureJar2 });
+      ok("Telegram sin configurar se reporta con claridad", !!linkError && /configurado/i.test(linkError.message ?? ""), linkError?.message ?? "(sin error)");
+    }
+  } else {
+    ok("fixture disponible para menciones", false, "la cuenta de prueba no pudo iniciar sesión (¿límite de intentos?) — reordenar secciones si esto falla");
+  }
+}
+
+// ---------- 10. Tickets de soporte ----------
+console.log("[10] Tickets de soporte");
+{
+  const { data: ticket, error } = await trpc("tickets.create", {
+    method: "POST",
+    input: { body: "/ticket Prueba automática: verificación del flujo de soporte" },
+    jar,
+  });
+  ok("ticket creado con /ticket", !!ticket?.id, error?.message);
+
+  if (ticket?.id) {
+    const { data: adminList } = await trpc("tickets.list", { jar });
+    const found = (adminList ?? []).find((t) => t.id === ticket.id);
+    ok("el admin ve el ticket en su bandeja", !!found);
+
+    const { data: notes } = await trpc("notifications.list", { jar });
+    const sawTicketNote = (notes?.items ?? []).some((n) => n.kind === "ticket" && n.ticketId === ticket.id);
+    ok("el admin recibió aviso del ticket", sawTicketNote);
+
+    const { error: resolveError, data: resolved } = await trpc("tickets.resolve", {
+      method: "POST",
+      input: { ticketId: ticket.id },
+      jar,
+    });
+    ok("ticket resuelto por el admin", resolved?.status === "resolved", resolveError?.message);
+
+    const { error: purgeError } = await trpc("tickets.purge", {
+      method: "POST",
+      input: { ticketId: ticket.id },
+      jar,
+    });
+    ok("limpieza del ticket de prueba", !purgeError, purgeError?.message);
+    await trpc("notifications.markAllRead", { method: "POST", jar });
+  }
+}
+
+// ---------- 11. Límite de intentos ----------
+console.log("[11] Límite de intentos");
 {
   let sawLimit = false;
   let lastMessage = "";
@@ -266,8 +345,8 @@ console.log("[9] Límite de intentos");
   ok("login repetido queda limitado", sawLimit, `último mensaje: ${lastMessage || "(sin error)"}`);
 }
 
-// ---------- 10. Logout ----------
-console.log("[10] Cierre de sesión");
+// ---------- 12. Cierre de sesión ----------
+console.log("[12] Cierre de sesión");
 {
   const { error } = await trpc("auth.logout", { method: "POST", jar });
   ok("logout", !error, error?.message);

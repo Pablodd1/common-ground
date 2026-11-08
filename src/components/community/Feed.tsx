@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { Heart, MessageCircle, Send, Sparkles, Trash2 } from "lucide-react";
+import { Heart, LifeBuoy, MessageCircle, Send, Sparkles, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser, type FeedPost } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
@@ -9,17 +9,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { PersonAvatar } from "./PersonAvatar";
 import { MediaButtons, MediaView, useMediaUpload } from "./Media";
+import { MentionDropdown, detectTicketCommand, renderWithMentions, useMentionState } from "./Mentions";
 
 const topics = ["Motivation", "Outside work", "Wins", "Questions"] as const;
 const topicLabels: Record<string, string> = { Motivation: "Motivación", "Outside work": "Fuera del trabajo", Wins: "Logros", Questions: "Preguntas", Celebration: "Celebración" };
 
 export function Feed({ currentUser, initialTopic }: { currentUser: CommunityUser; initialTopic?: string }) {
   const [body, setBody] = useState("");
+  const [caret, setCaret] = useState(0);
   const [topic, setTopic] = useState<(typeof topics)[number]>(initialTopic === "Questions" ? "Questions" : "Motivation");
   const [filter, setFilter] = useState("For you");
   const media = useMediaUpload();
   const utils = trpc.useUtils();
   const feed = trpc.community.feed.useQuery(undefined, { refetchInterval: 15000 });
+  const people = trpc.community.people.useQuery();
+  const mention = useMentionState(body, caret, people.data);
+  const isTicket = detectTicketCommand(body);
   const create = trpc.community.createPost.useMutation({
     onSuccess: () => {
       setBody("");
@@ -29,9 +34,28 @@ export function Feed({ currentUser, initialTopic }: { currentUser: CommunityUser
     },
     onError: (error) => toast.error(error.message),
   });
+  const createTicket = trpc.tickets.create.useMutation({
+    onSuccess: async ({ id }) => {
+      setBody("");
+      media.setAttachment(null);
+      toast.success(`Ticket #${id} creado: el administrador ya fue notificado`);
+      await Promise.all([utils.notifications.list.invalidate(), utils.tickets.mine.invalidate()]);
+    },
+    onError: (error) => toast.error(error.message),
+  });
 
   function submit() {
+    if (isTicket) {
+      createTicket.mutate({ body: body.trim() });
+      return;
+    }
     create.mutate({ body, topic, mediaKey: media.attachment?.key, mediaType: media.attachment?.contentType });
+  }
+
+  function pickMention(handle: string) {
+    const next = mention.apply(handle);
+    setBody(next);
+    setCaret((current) => current - mention.token!.length + handle.length + 2);
   }
 
   const visiblePosts = feed.data?.filter((post) => filter === "For you" || post.topic === filter) ?? [];
@@ -44,19 +68,26 @@ export function Feed({ currentUser, initialTopic }: { currentUser: CommunityUser
     </section>
 
     <section className="composer" aria-label="Crear una publicación">
-      <div className="composer-top">
+      <div className="composer-top mention-anchor">
         <PersonAvatar person={{ ...currentUser, id: currentUser.id, name: currentUser.name ?? "Tú" }} />
-        <Textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="¿Qué estás pensando?" maxLength={2000} rows={3} />
+        <MentionDropdown state={mention} onPick={pickMention} />
+        <Textarea value={body} onChange={(event) => { setBody(event.target.value); setCaret(event.target.selectionStart ?? event.target.value.length); }} onSelect={(event) => setCaret((event.target as HTMLTextAreaElement).selectionStart ?? 0)} onKeyDown={(event) => {
+          if (mention.token && mention.suggestions.length && event.key === "Tab") {
+            event.preventDefault();
+            pickMention(mention.suggestions[0].handle!);
+          }
+        }} placeholder="¿Qué estás pensando? Usa @ para mencionar a alguien o /ticket para soporte" maxLength={2000} rows={3} />
       </div>
-      {media.attachment && <div className="composer-preview"><MediaView mediaKey={media.attachment.key} mediaType={media.attachment.contentType} /></div>}
+      {isTicket && <div className="ticket-hint"><LifeBuoy /> Este mensaje se enviará como <strong>ticket de soporte</strong> al administrador, no al feed.</div>}
+      {media.attachment && !isTicket && <div className="composer-preview"><MediaView mediaKey={media.attachment.key} mediaType={media.attachment.contentType} /></div>}
       <div className="composer-actions">
         <MediaButtons {...media} />
         <div className="post-actions">
-          <select value={topic} onChange={(event) => setTopic(event.target.value as (typeof topics)[number])} aria-label="Tema de la publicación">
+          {!isTicket && <select value={topic} onChange={(event) => setTopic(event.target.value as (typeof topics)[number])} aria-label="Tema de la publicación">
             {topics.map((item) => <option key={item} value={item}>{topicLabels[item]}</option>)}
-          </select>
-          <Button onClick={submit} disabled={create.isPending || media.isUploading || (!body.trim() && !media.attachment)}>
-            <Send />{create.isPending ? "Compartiendo…" : "Compartir"}
+          </select>}
+          <Button onClick={submit} disabled={create.isPending || createTicket.isPending || media.isUploading || (!body.trim() && !media.attachment)}>
+            <Send />{isTicket ? (createTicket.isPending ? "Enviando ticket…" : "Enviar ticket") : create.isPending ? "Compartiendo…" : "Compartir"}
           </Button>
         </div>
       </div>
@@ -78,6 +109,9 @@ export function Feed({ currentUser, initialTopic }: { currentUser: CommunityUser
 function PostCard({ post, currentUser }: { post: FeedPost; currentUser: CommunityUser }) {
   const [showComments, setShowComments] = useState(false);
   const [comment, setComment] = useState("");
+  const [commentCaret, setCommentCaret] = useState(0);
+  const people = trpc.community.people.useQuery();
+  const mention = useMentionState(comment, commentCaret, people.data);
   const utils = trpc.useUtils();
   const like = trpc.community.toggleLike.useMutation({ onSuccess: () => void utils.community.feed.invalidate() });
   const addComment = trpc.community.addComment.useMutation({
@@ -90,6 +124,12 @@ function PostCard({ post, currentUser }: { post: FeedPost; currentUser: Communit
   });
   const isOwn = post.author.id === currentUser.id;
 
+  function pickCommentMention(handle: string) {
+    const next = mention.apply(handle);
+    setComment(next);
+    setCommentCaret((current) => current - mention.token!.length + handle.length + 2);
+  }
+
   return <article className="post-card">
     <header className="post-header">
       <PersonAvatar person={post.author} />
@@ -97,17 +137,22 @@ function PostCard({ post, currentUser }: { post: FeedPost; currentUser: Communit
       <span className="topic-label">{topicLabels[post.topic]}</span>
       {isOwn && <button className="post-delete" onClick={() => { if (window.confirm("¿Eliminar esta publicación?")) remove.mutate({ postId: post.id }); }} disabled={remove.isPending} aria-label="Eliminar mi publicación" title="Eliminar mi publicación"><Trash2 /></button>}
     </header>
-    {post.body && <p className="post-body">{post.body}</p>}
+    {post.body && <p className="post-body">{renderWithMentions(post.body)}</p>}
     {post.mediaKey && <MediaView mediaKey={post.mediaKey} mediaType={post.mediaType} />}
     <footer className="post-footer">
       <button className={post.liked ? "liked" : ""} onClick={() => like.mutate({ postId: post.id })} disabled={like.isPending} aria-label={post.liked ? "Quitar me gusta" : "Me gusta"}><Heart fill={post.liked ? "currentColor" : "none"} />{post.likeCount || "Me gusta"}</button>
       <button onClick={() => setShowComments((value) => !value)} aria-expanded={showComments}><MessageCircle />{post.comments.length || "Responder"}</button>
     </footer>
     {showComments && <div className="comments">
-      {post.comments.map((item) => <div className="comment" key={item.id}><PersonAvatar person={item.author} size="sm" /><div><strong>{item.author.name}</strong><p>{item.body}</p></div></div>)}
+      {post.comments.map((item) => <div className="comment" key={item.id}><PersonAvatar person={item.author} size="sm" /><div><strong>{item.author.name}</strong><p>{renderWithMentions(item.body)}</p></div></div>)}
       <form className="comment-form" onSubmit={(event) => { event.preventDefault(); if (comment.trim()) addComment.mutate({ postId: post.id, body: comment }); }}>
         <PersonAvatar person={{ ...currentUser, id: currentUser.id, name: currentUser.name ?? "Tú" }} size="sm" />
-        <Input value={comment} onChange={(event) => setComment(event.target.value)} placeholder="Escribe una respuesta…" maxLength={1000} />
+        <div className="comment-input-wrap mention-anchor">
+          <MentionDropdown state={mention} onPick={pickCommentMention} />
+          <Input value={comment} onChange={(event) => { setComment(event.target.value); setCommentCaret(event.target.selectionStart ?? event.target.value.length); }} onSelect={(event) => setCommentCaret((event.target as HTMLInputElement).selectionStart ?? 0)} onKeyDown={(event) => {
+            if (mention.token && mention.suggestions.length && event.key === "Tab") { event.preventDefault(); pickCommentMention(mention.suggestions[0].handle!); }
+          }} placeholder="Escribe una respuesta… (usa @ para mencionar)" maxLength={1000} />
+        </div>
         <Button size="icon" type="submit" disabled={!comment.trim() || addComment.isPending} aria-label="Enviar respuesta"><Send /></Button>
       </form>
     </div>}

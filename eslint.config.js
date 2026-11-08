@@ -28,6 +28,7 @@ export default defineConfig([
       'src/components/ui/**',
       'src/components/community/Media.tsx',
       'src/components/community/Celebrations.tsx',
+      'src/components/community/Mentions.tsx',
       'src/providers/trpc.tsx',
     ],
     rules: {

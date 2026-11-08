@@ -6,6 +6,8 @@ import { authedQuery, createRouter } from "./middleware";
 import { getDb } from "./queries/connection";
 import { removeObject, signReadUrl } from "./lib/storage";
 import { log } from "./lib/logger";
+import { ensureHandle, extractMentionHandles, parseTicketCommand, resolveMentions } from "./mentions";
+import { notifyUser } from "./lib/notify";
 
 const topicSchema = z.enum(["Motivation", "Outside work", "Wins", "Questions", "Celebration"]);
 // Uploads themselves go through POST /api/media (see server/media-upload.ts);
@@ -19,6 +21,7 @@ function publicPerson(person: typeof users.$inferSelect) {
   return {
     id: person.id,
     name: person.name ?? "Nuevo colega",
+    handle: person.handle,
     avatar: person.avatar,
     avatarKey: person.avatarKey,
     jobTitle: person.jobTitle,
@@ -30,6 +33,34 @@ function publicPerson(person: typeof users.$inferSelect) {
     startDate: person.startDate,
     isDemo: person.isDemo,
   };
+}
+
+/**
+ * Fan-out for @mentions inside newly created content. Never throws: a broken
+// notification must not roll back the post/comment/message the user wrote.
+ */
+async function notifyMentions(text: string, authorId: number, where: string): Promise<void> {
+  try {
+    const handles = extractMentionHandles(text);
+    if (!handles.length) return;
+    const author = await getDb().query.users.findFirst({ where: eq(users.id, authorId) });
+    const resolved = await resolveMentions(handles);
+    for (const [, person] of resolved) {
+      if (person.id === authorId) continue; // mentioning yourself is a note, not a ping
+      await notifyUser({
+        userId: person.id,
+        kind: "mention",
+        title: `${author?.name ?? "Alguien"} te mencionó ${where}`,
+        body: text.replace(/@([a-z0-9._-]+)/gi, "@…").slice(0, 300),
+        target: "feed",
+      });
+    }
+  } catch (error) {
+    log.error("mention fan-out failed", {
+      authorId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 
 async function assertMediaOwner(key: string | undefined, userId: number) {
@@ -54,8 +85,11 @@ export const communityRouter = createRouter({
   me: authedQuery.query(async ({ ctx }) => {
     const person = await getDb().query.users.findFirst({ where: eq(users.id, ctx.user.id) });
     if (!person) throw new TRPCError({ code: "NOT_FOUND" });
+    // Handles are minted lazily so every account becomes mentionable.
+    const handle = await ensureHandle(ctx.user.id, person.name);
     return {
       ...person,
+      handle,
       interestsList: person.interests ? person.interests.split(",").filter(Boolean) : [],
     };
   }),
@@ -147,7 +181,14 @@ export const communityRouter = createRouter({
       ...mediaInput.shape,
     }).refine((value) => value.body.length > 0 || value.mediaKey, "Escribe algo o agrega contenido multimedia."))
     .mutation(async ({ ctx, input }) => {
+      if (parseTicketCommand(input.body).isTicket) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Usa el botón de ticket (o la acción tickets.create) para reportar un problema; así llega al administrador.",
+        });
+      }
       await assertMediaOwner(input.mediaKey, ctx.user.id);
+      await ensureHandle(ctx.user.id, ctx.user.name);
       const [created] = await getDb().insert(posts).values({
         authorId: ctx.user.id,
         body: input.body,
@@ -155,6 +196,7 @@ export const communityRouter = createRouter({
         mediaKey: input.mediaKey,
         mediaType: input.mediaType,
       }).returning({ id: posts.id });
+      await notifyMentions(input.body, ctx.user.id, "en una publicación");
       return created;
     }),
 
@@ -222,8 +264,21 @@ export const communityRouter = createRouter({
     body: z.string().trim().min(1).max(1000),
   })).mutation(async ({ ctx, input }) => {
     await getDb().insert(comments).values({ ...input, authorId: ctx.user.id });
+    await notifyMentions(input.body, ctx.user.id, "en un comentario");
     return { ok: true };
   }),
+
+  deleteMessage: authedQuery.input(z.object({ messageId: z.number().int().positive() }))
+    .mutation(async ({ ctx, input }) => {
+      const message = await getDb().query.messages.findFirst({
+        where: eq(messages.id, input.messageId),
+      });
+      if (!message || message.senderId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "Solo puedes eliminar tus propios mensajes." });
+      }
+      await getDb().delete(messages).where(eq(messages.id, input.messageId));
+      return { ok: true };
+    }),
 
   celebrate: authedQuery.input(z.object({
     personId: z.number().int().positive(),
@@ -315,6 +370,7 @@ export const communityRouter = createRouter({
       });
       await db.update(conversations).set({ lastMessageAt: new Date() })
         .where(eq(conversations.id, input.conversationId));
+      await notifyMentions(input.body, ctx.user.id, "en un mensaje privado");
       return { ok: true };
     }),
 

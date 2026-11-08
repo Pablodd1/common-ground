@@ -30,4 +30,12 @@ export const env = {
     process.env.DEEPSEEK_BASE_URL ?? "https://api.deepseek.com/v1"
   ).replace(/\/+$/, ""),
   deepseekModel: process.env.DEEPSEEK_MODEL ?? "deepseek-chat",
+  // Notification channels. All optional: when absent the in-app bell still
+  // works and deliveries are logged as skipped.
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  telegramWebhookSecret: process.env.TELEGRAM_WEBHOOK_SECRET ?? "",
+  telegramOwnerChatId: process.env.TELEGRAM_OWNER_CHAT_ID ?? "",
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  resendFrom:
+    process.env.RESEND_FROM ?? "Unitec Familia <onboarding@resend.dev>",
 };

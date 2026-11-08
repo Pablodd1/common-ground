@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AlertCircle, ArrowUpRight, BookOpen, Building2, Check, ChevronRight, ExternalLink, FileText, GraduationCap, Library, LoaderCircle, Mail, MessageSquareText, Pencil, Phone, Plus, Send, ShieldCheck, Sparkles, Trash2, UserRound, UsersRound, X } from "lucide-react";
 import { trpc, type RouterOutputs } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
+import { TicketService } from "./TicketService";
 
 type ManualDocument = RouterOutputs["assistant"]["manual"]["documents"][number];
 type LibraryView = "manual" | "contacts" | "learning";
@@ -74,6 +75,8 @@ export function CompanyAssistant({ isAdmin }: { isAdmin: boolean }) {
           <button className="manual-mobile-button" onClick={() => setManualOpen((open) => !open)}><Library /> Centro de empresa</button>
         </div>
       </header>
+
+      <TicketService isAdmin={isAdmin} />
 
       <div className="assistant-scope"><ShieldCheck /><span><strong>Información pública + recursos internos publicados por un administrador.</strong> Si una política, un contacto o una respuesta no está publicada, el asistente lo dirá claramente.</span></div>
 

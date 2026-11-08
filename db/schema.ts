@@ -28,6 +28,11 @@ export const resourceKind = pgEnum("resource_kind", [
   "course",
   "file",
 ]);
+export const notificationKind = pgEnum("notification_kind", [
+  "mention",
+  "ticket",
+]);
+export const ticketStatus = pgEnum("ticket_status", ["open", "resolved"]);
 
 export const users = pgTable("users", {
   id: serial("id").primaryKey(),
@@ -50,6 +55,13 @@ export const users = pgTable("users", {
   // Set by an admin to revoke access (offboarding): login is refused and
   // existing sessions stop authenticating immediately. Null = active.
   disabledAt: timestamp("disabledAt"),
+  // @mention handle, unique across active accounts. Assigned lazily (first
+  // profile save or first mention lookup) so existing rows migrate cleanly.
+  handle: varchar("handle", { length: 40 }).unique(),
+  notifyByEmail: boolean("notifyByEmail").default(true).notNull(),
+  telegramChatId: varchar("telegramChatId", { length: 64 }),
+  telegramLinkCode: varchar("telegramLinkCode", { length: 12 }),
+  telegramLinkedAt: timestamp("telegramLinkedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -191,6 +203,46 @@ export const companyResources = pgTable(
   (table) => [index("company_resources_idx").on(table.kind, table.isPublished)],
 );
 
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: serial("id").primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    kind: notificationKind("kind").notNull(),
+    title: varchar("title", { length: 160 }).notNull(),
+    body: varchar("body", { length: 500 }).notNull(),
+    // Where the bell should send the user: "feed" | "empresa" (tickets).
+    target: varchar("target", { length: 20 }).notNull().default("feed"),
+    ticketId: integer("ticketId"),
+    readAt: timestamp("readAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("notifications_user_idx").on(table.userId, table.createdAt)],
+);
+
+export const tickets = pgTable(
+  "tickets",
+  {
+    id: serial("id").primaryKey(),
+    creatorId: integer("creatorId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    subject: varchar("subject", { length: 120 }).notNull(),
+    body: text("body").notNull(),
+    status: ticketStatus("status").default("open").notNull(),
+    resolvedAt: timestamp("resolvedAt"),
+    resolvedBy: integer("resolvedBy").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("tickets_status_idx").on(table.status, table.createdAt)],
+);
+
+export type Notification = typeof notifications.$inferSelect;
+export type Ticket = typeof tickets.$inferSelect;
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 export type Post = typeof posts.$inferSelect;

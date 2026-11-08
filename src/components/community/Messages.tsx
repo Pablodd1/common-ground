@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { es } from "date-fns/locale";
-import { ArrowLeft, MessageCircle, Send, Users } from "lucide-react";
+import { ArrowLeft, MessageCircle, Send, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser, type ConversationItem } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { PersonAvatar } from "./PersonAvatar";
 import { MediaButtons, MediaView, useMediaUpload } from "./Media";
+import { MentionDropdown, renderWithMentions, useMentionState } from "./Mentions";
 
 export function Messages({ currentUser, activeConversation, setActiveConversation, onFindPeople }: {
   currentUser: CommunityUser;
@@ -40,14 +41,25 @@ export function Messages({ currentUser, activeConversation, setActiveConversatio
 
 function Thread({ conversationId, other, currentUser, onBack }: { conversationId: number; other: NonNullable<ConversationItem["other"]>; currentUser: CommunityUser; onBack: () => void }) {
   const [body, setBody] = useState("");
+  const [caret, setCaret] = useState(0);
   const endRef = useRef<HTMLDivElement>(null);
   const media = useMediaUpload();
   const utils = trpc.useUtils();
+  const people = trpc.community.people.useQuery();
+  const mention = useMentionState(body, caret, people.data);
   const messages = trpc.community.messages.useQuery({ conversationId }, { refetchInterval: 5000 });
   const send = trpc.community.sendMessage.useMutation({
     onSuccess: () => {
       setBody("");
       media.setAttachment(null);
+      void utils.community.messages.invalidate({ conversationId });
+      void utils.community.conversations.invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+  const removeMessage = trpc.community.deleteMessage.useMutation({
+    onSuccess: () => {
+      toast.success("Mensaje eliminado");
       void utils.community.messages.invalidate({ conversationId });
       void utils.community.conversations.invalidate();
     },
@@ -60,21 +72,43 @@ function Thread({ conversationId, other, currentUser, onBack }: { conversationId
     send.mutate({ conversationId, body, mediaKey: media.attachment?.key, mediaType: media.attachment?.contentType });
   }
 
+  function pickMention(handle: string) {
+    const next = mention.apply(handle);
+    setBody(next);
+    setCaret((current) => current - mention.token!.length + handle.length + 2);
+  }
+
   return <>
     <header className="thread-header"><Button variant="ghost" size="icon" className="thread-back" onClick={onBack} aria-label="Volver a conversaciones"><ArrowLeft /></Button><PersonAvatar person={other} /><div><strong>{other.name}</strong><p>{other.jobTitle || "Colega"}</p></div></header>
     <div className="message-history" aria-live="polite">
       {messages.isLoading && <p className="muted-copy">Cargando mensajes…</p>}
       {!messages.isLoading && !messages.data?.length && <div className="first-message"><PersonAvatar person={other} size="lg" /><h2>Saluda a {other.name.split(" ")[0]}.</h2><p>Los dos tienen {other.interests[0] ? `un interés en ${other.interests[0]} para comenzar` : "mucho por descubrir el uno del otro"}.</p></div>}
       {messages.data?.map((message) => <div className={`message-bubble ${message.senderId === currentUser.id ? "mine" : "theirs"}`} key={message.id}>
-        {message.body && <p>{message.body}</p>}
+        {message.body && <p>{renderWithMentions(message.body)}</p>}
         {message.mediaKey && <MediaView mediaKey={message.mediaKey} mediaType={message.mediaType} />}
-        <time>{formatDistanceToNow(message.createdAt, { addSuffix: true, locale: es })}</time>
+        <div className="bubble-footer">
+          <time>{formatDistanceToNow(message.createdAt, { addSuffix: true, locale: es })}</time>
+          {message.senderId === currentUser.id && (
+            <button className="message-delete" onClick={() => { if (window.confirm("¿Eliminar este mensaje?")) removeMessage.mutate({ messageId: message.id }); }} disabled={removeMessage.isPending} aria-label="Eliminar mi mensaje" title="Eliminar mi mensaje"><Trash2 /></button>
+          )}
+        </div>
       </div>)}
       <div ref={endRef} />
     </div>
     <div className="message-composer">
       {media.attachment && <MediaView mediaKey={media.attachment.key} mediaType={media.attachment.contentType} />}
-      <div className="message-input-row"><Textarea rows={1} value={body} onChange={(event) => setBody(event.target.value)} placeholder={`Mensaje para ${other.name.split(" ")[0]}…`} onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if ((body.trim() || media.attachment) && !media.isUploading) submit(); } }} /><Button size="icon" onClick={submit} disabled={send.isPending || media.isUploading || (!body.trim() && !media.attachment)} aria-label="Enviar mensaje"><Send /></Button></div>
+      <div className="message-input-row mention-anchor">
+        <MentionDropdown state={mention} onPick={pickMention} />
+        <Textarea rows={1} value={body} onChange={(event) => { setBody(event.target.value); setCaret(event.target.selectionStart ?? event.target.value.length); }} onSelect={(event) => setCaret((event.target as HTMLTextAreaElement).selectionStart ?? 0)} placeholder={`Mensaje para ${other.name.split(" ")[0]}… (usa @ para mencionar)`} onKeyDown={(event) => {
+          if (mention.token && mention.suggestions.length && ["Tab", "ArrowDown", "ArrowUp"].includes(event.key)) {
+            // Keyboard cycling handled by the dropdown's active state on click;
+            // Tab completes the first suggestion.
+            if (event.key === "Tab") { event.preventDefault(); pickMention(mention.suggestions[0].handle!); }
+            return;
+          }
+          if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); if ((body.trim() || media.attachment) && !media.isUploading) submit(); }
+        }} /><Button size="icon" onClick={submit} disabled={send.isPending || media.isUploading || (!body.trim() && !media.attachment)} aria-label="Enviar mensaje"><Send /></Button>
+      </div>
       <MediaButtons {...media} compact />
     </div>
   </>;

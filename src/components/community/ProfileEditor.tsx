@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { PersonAvatar } from "./PersonAvatar";
 import { MediaButtons, useMediaUpload } from "./Media";
+import { NotificationSettings } from "./NotificationSettings";
 
 export function ProfileEditor({ open, onOpenChange, user }: { open: boolean; onOpenChange: (open: boolean) => void; user: CommunityUser }) {
   // Seeded at mount: CommunityApp only mounts this editor while it is open, so
@@ -59,6 +60,7 @@ export function ProfileEditor({ open, onOpenChange, user }: { open: boolean; onO
           <label><input type="checkbox" checked={form.shareBirthday} onChange={(e) => set("shareBirthday", e.target.checked)} /><span><strong>Compartir mi cumpleaños</strong><small>Tus compañeros verán el mes y el día, nunca el año.</small></span></label>
           <label><input type="checkbox" checked={form.shareLocation} onChange={(e) => set("shareLocation", e.target.checked)} /><span><strong>Compartir mi ubicación</strong><small>Desactiva esta opción para ocultarla en el directorio de personas.</small></span></label>
         </div>
+        <NotificationSettings handle={user.handle} />
         <ChangePassword />
         <div className="dialog-actions"><Button type="button" variant="ghost" onClick={() => onOpenChange(false)}>Cancelar</Button><Button type="submit" disabled={update.isPending || media.isUploading || form.name.trim().length < 2}>{update.isPending ? "Guardando…" : "Guardar perfil"}</Button></div>
       </form>

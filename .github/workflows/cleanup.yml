@@ -1,0 +1,20 @@
+name: Limpieza de archivos huérfanos
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # diario 03:17 UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ejecutar limpieza en producción
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          response=$(curl -fsS -m 120 -X POST "$BASE_URL/api/cron/cleanup" \
+            -H "x-cron-secret: $CRON_SECRET") \
+            || { echo "::error::La limpieza falló (¿secrets BASE_URL/CRON_SECRET o despliegue?)"; exit 1; }
+          echo "Resultado: $response"

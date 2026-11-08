@@ -9,6 +9,7 @@ import { Celebrations, CelebrationsRail, useCelebrations } from "./Celebrations"
 import { ProfileEditor } from "./ProfileEditor";
 import { PersonAvatar } from "./PersonAvatar";
 import { CompanyAssistant } from "./CompanyAssistant";
+import { NotificationsBell } from "./NotificationsBell";
 
 type Tab = "feed" | "people" | "messages" | "assistant" | "celebrations";
 
@@ -50,7 +51,7 @@ export function CommunityApp({ onLogout }: { onLogout: () => void }) {
       </div>
     </aside>
 
-    <header className="mobile-header"><Brand /><button onClick={() => setProfileOpen(true)} aria-label="Editar tu perfil"><PersonAvatar person={{ ...user, name: user.name ?? "Tú" }} size="sm" /></button></header>
+    <header className="mobile-header"><Brand /><NotificationsBell onNavigate={(target) => setTab(target)} /><button onClick={() => setProfileOpen(true)} aria-label="Editar tu perfil"><PersonAvatar person={{ ...user, name: user.name ?? "Tú" }} size="sm" /></button></header>
 
     <main className={`community-main main-${tab}`}>
       {tab === "feed" && <div className="feed-layout"><Feed currentUser={user} /><aside className="right-rail"><CelebrationsRail events={events} currentUser={user} /><CommunityPrinciples /></aside></div>}
