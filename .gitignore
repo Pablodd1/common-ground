@@ -54,3 +54,4 @@ auth.json
 *.dump
 dump.sql
 .env*
+docs/preview/
