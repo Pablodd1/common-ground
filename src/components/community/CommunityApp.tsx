@@ -43,7 +43,7 @@ export function CommunityApp({ onLogout }: { onLogout: () => void }) {
 
   return <div className="community-shell">
     <aside className="desktop-sidebar">
-      <Brand />
+      <div className="sidebar-top"><Brand /><NotificationsBell onNavigate={(target) => setTab(target)} /></div>
       <nav aria-label="Navegación principal">{navItems.map((item) => <button key={item.id} className={tab === item.id ? "active" : ""} onClick={() => setTab(item.id)}><item.icon /><span>{item.label}</span></button>)}</nav>
       <div className="sidebar-bottom">
         <button className="sidebar-profile" onClick={() => setProfileOpen(true)}><PersonAvatar person={{ ...user, name: user.name ?? "Tú" }} /><span><strong>{user.name}</strong><small>{user.jobTitle || "Completa tu perfil"}</small></span><Settings2 /></button>
