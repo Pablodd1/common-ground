@@ -54,16 +54,16 @@ Agregar `RESEND_API_KEY` (y `RESEND_FROM` con dominio verificado) en Vercel. Sin
 
 ### Antes de abrirlo a todo el personal
 1. **Dominio propio** (p..j. `familia.unitecusadesign.com`) y SSL: Vercel → Settings → Domains. La CSP de `vercel.json` ya incluye el origen de Supabase; no requiere cambios.
-2. **Lista explícita de empleados.** Hoy cualquier correo `@unitecusadesign.com` se auto-registra. Para privacidad real: aprobar cuentas una a una (admin) o cargar una lista de correos válidos antes del registro.
+2. ~~Lista explícita de empleados~~ **✅ HECHO (2026-11-22): aprobación de cuentas.** `SIGNUP_MODE=approval` está ACTIVO en producción: cada registro queda pendiente hasta que un administrador lo apruebe desde **Personas → Solicitudes pendientes** (también se puede rechazar). Al aprobar, la persona recibe la notificación «Tu cuenta fue aprobada 🎉». Para volver al modo demo (entrada inmediata): quitar o cambiar `SIGNUP_MODE` a `open` en Vercel y redesplegar; las cuentas pendientes se admiten en su próximo ingreso.
 3. **Rotar credenciales compartidas por chat** (DeepSeek, `sb_secret`, DB, `APP_SECRET`) y dejarlas solo en Vercel/GitHub secrets.
 4. **Recuperación de contraseña por correo:** configurar Site URL y plantillas en Supabase Auth (necesita acceso al panel; el flujo de cambio de contraseña ya existe dentro de la app).
-5. **PITR o backups administrados de Supabase** además del pg_dump semanal (el plan gratuito solo retiene días).
+5. **PITR o backups administrados de Supabase** además del pg_dump semanal (verificado por primera vez el 2026-11-22; practica una restauración).
 
 ### Siguientes mejoras de producto
-6. Editar/eliminar mensajes directos propios y notificaciones (hoy solo publicaciones).
-7. Limpieza programada de archivos subidos que nunca se adjuntan (hoy se quedan en Storage).
-8. Métricas de uso (ingresos, publicaciones, uso del asistente) — un panel mínimo para RR. HH.
-9. Los cumpleaños del directorio dependen de que cada persona complete su perfil; un recordatorio amable en el primer ingreso ayudaría.
+6. Editar mensajes directos propios (eliminar ya existe) y más tipos de notificación.
+7. Métricas de uso (ingresos, publicaciones, uso del asistente) — un panel mínimo para RR. HH.
+8. Los cumpleaños del directorio dependen de que cada persona complete su perfil; un recordatorio amable en el primer ingreso ayudaría.
+9. PWA manifest para instalar en teléfonos del personal.
 
 ### Si crece el uso
 10. Paginación real del feed (hoy top 50) y del historial de mensajes.
