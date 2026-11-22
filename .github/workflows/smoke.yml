@@ -19,3 +19,25 @@ jobs:
           SMOKE_EMAIL: ${{ secrets.SMOKE_EMAIL }}
           SMOKE_PASSWORD: ${{ secrets.SMOKE_PASSWORD }}
         run: node scripts/smoke.mjs
+
+  # Jev watchman: classifies route health (jev-latest when TYPESAFE_API_KEY is
+  # present, deterministic heuristics otherwise) and pages Telegram/webhook on
+  # confirmed outages. Complements the smoke suite: smoke proves the FLOWS,
+  # Jev explains and alerts on the SURFACE.
+  jev-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Jev route health audit
+        env:
+          BASE_URL: ${{ secrets.BASE_URL }}
+          TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          ALERT_WEBHOOK_URL: ${{ secrets.ALERT_WEBHOOK_URL }}
+        run: node scripts/jev-audit.mjs
