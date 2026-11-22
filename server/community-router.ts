@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, inArray, isNull, or } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { comments, conversations, files, likes, messages, posts, users } from "@db/schema";
@@ -127,9 +127,10 @@ export const communityRouter = createRouter({
     }),
 
   people: authedQuery.query(async () => {
-    // Disabled (offboarded) accounts disappear from the directory.
+    // Only admitted accounts appear: approved, not disabled. Pending signups
+    // and offboarded accounts are invisible to the directory.
     const people = await getDb().select().from(users)
-      .where(isNull(users.disabledAt))
+      .where(and(isNull(users.disabledAt), isNotNull(users.approvedAt)))
       .orderBy(users.name)
       .limit(100);
     return people.map(publicPerson);

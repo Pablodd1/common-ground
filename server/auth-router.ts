@@ -63,10 +63,11 @@ function toAuthError(error: unknown): never {
 }
 
 export const authRouter = createRouter({
-  // Public sign-in parameters for the login screen (domains only; never the
-  // owner address or any key material).
+  // Public sign-in parameters for the login screen (domains and mode only;
+  // never the owner address or any key material).
   publicConfig: publicQuery.query(() => ({
     allowedDomains: env.allowedEmailDomains,
+    signupMode: env.signupMode,
   })),
 
   signUp: publicQuery
@@ -81,7 +82,17 @@ export const authRouter = createRouter({
       try {
         enforceAuthRateLimit(ctx.req.headers, input.email);
         assertEmailAllowed(input.email);
-        await adminCreateUser(input.email, input.password, input.name);
+        const profile = await adminCreateUser(input.email, input.password, input.name);
+        if (env.signupMode === "approval") {
+          // Row is created pending (approvedAt null); no session is minted
+          // until an admin approves and the person signs in.
+          await upsertUserByAuthId({
+            authId: profile.id,
+            email: input.email,
+            name: input.name,
+          });
+          return { pending: true as const };
+        }
       } catch (error) {
         toAuthError(error);
       }
@@ -169,6 +180,17 @@ async function signInAndMintSession(
   if (user.disabledAt) {
     throw new AuthRejected(
       "Tu cuenta está desactivada. Contacta al administrador de la empresa.",
+    );
+  }
+  // Pending-approval gate: owner and admins are always admitted.
+  if (
+    env.signupMode === "approval" &&
+    !user.approvedAt &&
+    user.role !== "admin" &&
+    user.email.toLowerCase() !== env.ownerEmail
+  ) {
+    throw new AuthRejected(
+      "Tu cuenta está en revisión. Te avisaremos en cuanto un administrador la apruebe.",
     );
   }
   const sessionToken = await signSessionToken({ authId: profile.id });

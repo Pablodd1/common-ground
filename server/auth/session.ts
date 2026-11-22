@@ -55,6 +55,11 @@ export async function authenticateRequest(headers: Headers): Promise<User> {
   if (user.disabledAt) {
     throw new Error("Account is disabled.");
   }
+  // Defense in depth for the approval gate: sessions are only minted after
+  // approval, but a mode flip must also invalidate any hypothetical strays.
+  if (!user.approvedAt && user.role !== "admin") {
+    throw new Error("Account is pending approval.");
+  }
   return user;
 }
 

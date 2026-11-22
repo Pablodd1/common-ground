@@ -22,6 +22,20 @@
       "when": 1794163380134,
       "tag": "0002_fluffy_bloodscream",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1795371217603,
+      "tag": "0003_ancient_lord_hawal",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795371511114,
+      "tag": "0004_clear_quentin_quire",
+      "breakpoints": true
     }
   ]
 }

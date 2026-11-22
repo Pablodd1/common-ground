@@ -246,6 +246,49 @@ console.log("[8] Administración (bajas y altas)");
   }
 }
 
+// ---------- 8b. Aprobación de cuentas (SIGNUP_MODE=approval) ----------
+console.log("[8b] Aprobación de cuentas");
+{
+  const { data: cfg } = await trpc("auth.publicConfig");
+  ok("modo de registro expuesto", cfg?.signupMode === "approval" || cfg?.signupMode === "open", `modo: ${cfg?.signupMode}`);
+
+  if (cfg?.signupMode === "approval") {
+    const fixture = await trpc("auth.login", { method: "POST", input: { email: OFFBOARD_EMAIL, password: OFFBOARD_PASSWORD }, jar: {} });
+    const fixtureId = fixture.data?.user?.id;
+    if (fixtureId) {
+      const { error: revokeError } = await trpc("admin.setUserApproved", {
+        method: "POST",
+        input: { userId: fixtureId, approved: false },
+        jar,
+      });
+      ok("admin revoca la aprobación", !revokeError, revokeError?.message);
+
+      const blocked = await trpc("auth.login", { method: "POST", input: { email: OFFBOARD_EMAIL, password: OFFBOARD_PASSWORD }, jar: {} });
+      ok("login bloqueado para cuenta pendiente", !!blocked.error && /revisión/i.test(blocked.error.message ?? ""), blocked.error?.message);
+
+      const { data: people } = await trpc("community.people", { jar });
+      ok("la cuenta pendiente no está en el directorio", !(people ?? []).some((p) => p.id === fixtureId));
+
+      const { data: adminList } = await trpc("admin.listUsers", { jar });
+      ok("la cuenta pendiente es visible para el admin", (adminList ?? []).some((u) => u.id === fixtureId && !u.approvedAt));
+
+      const { error: approveError, data: approved } = await trpc("admin.setUserApproved", {
+        method: "POST",
+        input: { userId: fixtureId, approved: true },
+        jar,
+      });
+      ok("admin aprueba la cuenta", !!approved?.approvedAt, approveError?.message);
+
+      const back = await trpc("auth.login", { method: "POST", input: { email: OFFBOARD_EMAIL, password: OFFBOARD_PASSWORD }, jar: {} });
+      ok("login funciona tras aprobación", !!back.data?.user, back.error?.message);
+    }
+  } else {
+    // In open mode the round-trip is a no-op by design; keep the suite honest
+    // about what it did and did not exercise.
+    ok("modo abierto: sin puerta de aprobación que probar", true, "SIGNUP_MODE != approval");
+  }
+}
+
 // ---------- 9. Menciones @usuario ----------
 // Uses the offboarding fixture as mention target. Must run BEFORE the rate
 // limiting section, which burns that account's login budget on purpose.

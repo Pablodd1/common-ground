@@ -31,6 +31,7 @@ export const resourceKind = pgEnum("resource_kind", [
 export const notificationKind = pgEnum("notification_kind", [
   "mention",
   "ticket",
+  "system",
 ]);
 export const ticketStatus = pgEnum("ticket_status", ["open", "resolved"]);
 
@@ -55,6 +56,10 @@ export const users = pgTable("users", {
   // Set by an admin to revoke access (offboarding): login is refused and
   // existing sessions stop authenticating immediately. Null = active.
   disabledAt: timestamp("disabledAt"),
+  // Signup gate for real-staff operation (SIGNUP_MODE=approval): null while
+  // the account awaits an admin's approval; set = may enter. The migration
+  // that adds this column backfills every existing account as approved.
+  approvedAt: timestamp("approvedAt"),
   // @mention handle, unique across active accounts. Assigned lazily (first
   // profile save or first mention lookup) so existing rows migrate cleanly.
   handle: varchar("handle", { length: 40 }).unique(),

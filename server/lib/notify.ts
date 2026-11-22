@@ -59,7 +59,7 @@ async function deliverEmail(to: string, subject: string, text: string): Promise<
 
 export type NotifyInput = {
   userId: number;
-  kind: "mention" | "ticket";
+  kind: "mention" | "ticket" | "system";
   title: string;
   body: string;
   target?: "feed" | "empresa";

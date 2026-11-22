@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2, LogIn, UserPlus } from "lucide-react";
+import { Clock, Loader2, LogIn, UserPlus } from "lucide-react";
 import { trpc } from "@/providers/trpc";
 import { useNavigate } from "react-router";
 
@@ -16,10 +16,12 @@ export default function Login() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [awaitingApproval, setAwaitingApproval] = useState<string | null>(null);
   const utils = trpc.useUtils();
 
   const config = trpc.auth.publicConfig.useQuery();
   const allowedDomains = config.data?.allowedDomains ?? [];
+  const approvalMode = config.data?.signupMode === "approval";
 
   function handleError(error: { message?: string } | null | undefined) {
     toast.error(error?.message || "No pudimos completar la operación. Inténtalo de nuevo.");
@@ -32,13 +34,29 @@ export default function Login() {
   // A freshly issued session cookie must be visible to auth.me; the query
   // cache from the logged-out state would otherwise still answer null.
   useEffect(() => {
-    const mutation = mode === "login" ? loginMutation : signUpMutation;
-    if (mutation.isSuccess) {
+    if (loginMutation.isSuccess) {
       void utils.auth.me.invalidate();
       navigate("/");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loginMutation.isSuccess, signUpMutation.isSuccess]);
+  }, [loginMutation.isSuccess]);
+
+  // Approval mode: a successful signup without a session means "created,
+  // waiting for an admin" — show the notice instead of navigating.
+  useEffect(() => {
+    const data = signUpMutation.data;
+    if (signUpMutation.isSuccess && data && "pending" in data && data.pending) {
+      setAwaitingApproval(email);
+      setName("");
+      setEmail("");
+      setPassword("");
+      setMode("login");
+    } else if (signUpMutation.isSuccess) {
+      void utils.auth.me.invalidate();
+      navigate("/");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signUpMutation.isSuccess]);
 
   function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -59,6 +77,17 @@ export default function Login() {
           </p>
         </CardHeader>
         <CardContent>
+          {awaitingApproval && (
+            <div className="mb-6 rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm" role="status">
+              <p className="flex items-center gap-2 font-medium text-primary">
+                <Clock aria-hidden="true" />
+                Cuenta creada: {awaitingApproval}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                Un administrador revisará tu solicitud. Cuando la apruebe, inicia sesión con este correo y tu contraseña.
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-1 mb-6" role="tablist" aria-label="Tipo de acceso">
             <Button
               type="button"
@@ -128,6 +157,7 @@ export default function Login() {
               {mode === "signup" && (
                 <p className="text-xs text-muted-foreground">
                   Mínimo 10 caracteres. Guárdala: hoy no hay recuperación de contraseña.
+                  {approvalMode && " Tu cuenta quedará en revisión hasta que un administrador la apruebe."}
                 </p>
               )}
             </div>

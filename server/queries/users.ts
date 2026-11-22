@@ -49,6 +49,9 @@ export async function upsertUserByAuthId(data: {
       email: data.email,
       name: data.name,
       ...(isOwner ? { role: "admin" as const } : {}),
+      ...(env.signupMode === "open" || isOwner
+        ? { approvedAt: new Date() }
+        : {}),
     })
     .onConflictDoUpdate({
       target: users.authId,
@@ -60,6 +63,12 @@ export async function upsertUserByAuthId(data: {
         lastSignInAt: new Date(),
         // Promote the owner on login, never demote an existing admin.
         ...(isOwner ? { role: "admin" as const } : {}),
+        // Under 'open' registration a pending row (created while the project
+        // was in approval mode) is admitted on its next login; approval mode
+        // leaves it pending for an admin to decide.
+        ...(env.signupMode === "open"
+          ? { approvedAt: sql`coalesce(${users.approvedAt}, now())` }
+          : {}),
       },
     })
     .returning();

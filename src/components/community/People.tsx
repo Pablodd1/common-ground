@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { MapPin, MessageCircle, Search, ShieldOff, ShieldCheck, X } from "lucide-react";
+import { Clock, MapPin, MessageCircle, Search, ShieldOff, ShieldCheck, UserCheck, X } from "lucide-react";
 import { toast } from "sonner";
 import { trpc, type CommunityUser, type Person } from "@/providers/trpc";
 import { Button } from "@/components/ui/button";
@@ -25,8 +25,21 @@ export function People({ currentUser, onMessage }: { currentUser: CommunityUser;
     },
     onError: (error) => toast.error(error.message),
   });
+  const setApproved = trpc.admin.setUserApproved.useMutation({
+    onSuccess: async ({ approvedAt }) => {
+      toast.success(approvedAt ? "Cuenta aprobada: la persona ya puede ingresar" : "Aprobación revocada");
+      await Promise.all([utils.admin.listUsers.invalidate(), utils.community.people.invalidate()]);
+    },
+    onError: (error) => toast.error(error.message),
+  });
   const disabledIds = useMemo(
     () => new Set((adminUsers.data ?? []).filter((u) => u.disabledAt).map((u) => u.id)),
+    [adminUsers.data],
+  );
+  // Pending signups: exist as accounts but not yet admitted. They are absent
+  // from `people` on purpose — this admin rail is the only place they surface.
+  const pendingUsers = useMemo(
+    () => (adminUsers.data ?? []).filter((u) => !u.approvedAt && !u.disabledAt),
     [adminUsers.data],
   );
 
@@ -55,6 +68,33 @@ export function People({ currentUser, onMessage }: { currentUser: CommunityUser;
         <select value={interest} onChange={(event) => setInterest(event.target.value)} aria-label="Filtrar por interés">{interests.map((item) => <option key={item}>{item}</option>)}</select>
       </div>
       <p className="results-count">{filtered.length} {filtered.length === 1 ? "persona" : "personas"}</p>
+      {isUserAdmin && pendingUsers.length > 0 && (
+        <section className="pending-approvals" aria-label="Solicitudes pendientes de aprobación">
+          <header>
+            <Clock />
+            <h2>Solicitudes pendientes ({pendingUsers.length})</h2>
+            <p>Cuentas creadas que aún no pueden entrar hasta que las apruebes.</p>
+          </header>
+          <ul>
+            {pendingUsers.map((u) => (
+              <li key={u.id}>
+                <span>
+                  <strong>{u.name ?? u.email}</strong>
+                  <small>{u.email}</small>
+                </span>
+                <span className="pending-actions">
+                  <Button size="sm" onClick={() => setApproved.mutate({ userId: u.id, approved: true })} disabled={setApproved.isPending}>
+                    <UserCheck />Aprobar
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => { if (window.confirm(`¿Rechazar la solicitud de ${u.name ?? u.email}? La cuenta quedará desactivada.`)) setDisabled.mutate({ userId: u.id, disabled: true }); }} disabled={setDisabled.isPending}>
+                    <ShieldOff />Rechazar
+                  </Button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {people.isLoading ? <div className="people-grid">{[1, 2, 3].map((item) => <div className="person-skeleton" key={item} />)}</div> : <div className="people-grid">
         {filtered.map((person) => <article className="person-card" key={person.id}>
           <button className="person-main" onClick={() => setSelected(person)}>

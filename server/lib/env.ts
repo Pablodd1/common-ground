@@ -24,6 +24,10 @@ export const env = {
     .map((domain) => domain.trim().toLowerCase().replace(/^@/, ""))
     .filter(Boolean),
   ownerEmail: (process.env.OWNER_EMAIL ?? "").trim().toLowerCase(),
+  // 'open': any allow-listed domain e-mail enters immediately (demo mode).
+  // 'approval': signups stay pending until an admin approves them — the gate
+  // for operating with real staff.
+  signupMode: process.env.SIGNUP_MODE === "approval" ? "approval" : "open",
   // OpenAI-compatible gateway (DeepSeek by default).
   deepseekApiKey: required("DEEPSEEK_API_KEY"),
   deepseekBaseUrl: (

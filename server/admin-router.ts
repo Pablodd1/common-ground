@@ -6,6 +6,7 @@ import { files, messages, posts, users } from "@db/schema";
 import { adminQuery, createRouter } from "./middleware";
 import { getDb } from "./queries/connection";
 import { removeObject } from "./lib/storage";
+import { notifyUser } from "./lib/notify";
 import { log } from "./lib/logger";
 
 /**
@@ -51,6 +52,7 @@ export const adminRouter = createRouter({
         email: users.email,
         role: users.role,
         disabledAt: users.disabledAt,
+        approvedAt: users.approvedAt,
         lastSignInAt: users.lastSignInAt,
         createdAt: users.createdAt,
       })
@@ -59,6 +61,43 @@ export const adminRouter = createRouter({
       .limit(200);
     return rows;
   }),
+
+  // Admission control: approve a pending signup (or revoke an approval).
+  // Approving also notifies the person through their configured channels.
+  setUserApproved: adminQuery
+    .input(
+      z.object({
+        userId: z.number().int().positive(),
+        approved: z.boolean(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      if (input.userId === ctx.user.id) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "No puedes cambiar la aprobación de tu propia cuenta.",
+        });
+      }
+      const target = await getDb().query.users.findFirst({
+        where: eq(users.id, input.userId),
+      });
+      if (!target) throw new TRPCError({ code: "NOT_FOUND" });
+      const [updated] = await getDb()
+        .update(users)
+        .set({ approvedAt: input.approved ? new Date() : null })
+        .where(eq(users.id, input.userId))
+        .returning({ id: users.id, approvedAt: users.approvedAt });
+      if (input.approved) {
+        await notifyUser({
+          userId: updated.id,
+          kind: "system",
+          title: "Tu cuenta fue aprobada 🎉",
+          body: "Ya puedes entrar a Unitec Familia. ¡Te estábamos esperando!",
+          target: "feed",
+        });
+      }
+      return { id: updated.id, approvedAt: updated.approvedAt };
+    }),
 
   // Disabling blocks login AND kills existing sessions (authenticateRequest
   // rejects disabled users); it is reversible, unlike deleting the row, so the
