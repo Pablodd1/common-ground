@@ -103,11 +103,13 @@ export const authRouter = createRouter({
 
   login: publicQuery
     .input(z.object({ email: emailSchema, password: passwordSchema }))
-    .mutation(({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
         enforceAuthRateLimit(ctx.req.headers, input.email);
         assertEmailAllowed(input.email);
-        return signInAndMintSession(ctx, input.email, input.password);
+        // await is load-bearing: without it the async rejections (pending /
+        // disabled / bad credentials) escape this try and surface as 500s.
+        return await signInAndMintSession(ctx, input.email, input.password);
       } catch (error) {
         toAuthError(error);
       }
