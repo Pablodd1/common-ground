@@ -79,7 +79,7 @@ export function NotificationSettings({ handle }: { handle?: string | null }) {
               <small>o envía <code>/start {link.data.code}</code> al bot</small>
             </div>
           ) : (
-            <Button variant="outline" onClick={() => link.mutate()} disabled={link.isPending}>
+            <Button type="button" variant="outline" onClick={() => link.mutate()} disabled={link.isPending}>
               {link.isPending ? "Generando…" : "Conectar"}
             </Button>
           )
